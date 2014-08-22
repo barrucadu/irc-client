@@ -14,11 +14,13 @@ module Network.IRC.IDTE
     , defaultIRCConf
     , defaultDisconnectHandler
     , setNick
+    , leaveChannel
     ) where
 
 import Control.Applicative    ((<$>))
 import Control.Concurrent     (forkIO, threadDelay)
-import Control.Monad          (forever, when)
+import Control.Concurrent.STM (STM, TVar, atomically, readTVar, writeTVar)
+import Control.Monad          (forever, unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.Char              (isAlphaNum)
@@ -205,6 +207,8 @@ defaultIRCConf n = InstanceConfig
                                         , EventHandler "Respond to CTCP TIME requests"    ECTCP ctcpTimeHandler
                                         , EventHandler "Update the nick upon welcome"     ENumeric welcomeNick
                                         , EventHandler "Mangle the nick on collision"     ENumeric nickMangler
+                                        , EventHandler "Update the channel list on JOIN"  ENumeric joinHandler
+                                        , EventHandler "Update the channel lift on KICK"  EKick    kickHandler
                                         ]
                      }
 
@@ -243,8 +247,11 @@ ctcpTimeHandler ev = do
 welcomeNick :: Event -> IRC ()
 welcomeNick ev = case _message ev of
                    Numeric 001 (srvNick:_) -> do
-                     iconf <- instanceConfig
-                     putInstanceConfig iconf { _nick = srvNick }
+                     tvarI <- instanceConfigTVar
+
+                     liftIO . atomically $ do
+                       iconf <- readTVar tvarI
+                       writeTVar tvarI iconf { _nick = srvNick }
                    _ -> return ()
 
 -- |Mangle the nick if there's a collision when we set it
@@ -314,12 +321,56 @@ nickMangler ev = do
                                 then Just (before, T.drop (T.length delim) after)
                                 else Nothing
 
+-- |Upon receiving a RPL_TOPIC, add the channel to the list (if not
+-- already present).
+joinHandler :: Event -> IRC ()
+joinHandler ev = case _message ev of
+                   Numeric 332 (c:_) -> do
+                     tvarI <- instanceConfigTVar
+
+                     liftIO . atomically $ do
+                       iconf <- readTVar tvarI
+                       unless (c `elem` _channels iconf) $
+                         writeTVar tvarI iconf { _channels = c : _channels iconf }
+
+                   _ -> return ()
+
+-- |Update the channel list upon being kicked.
+kickHandler :: Event -> IRC ()
+kickHandler ev = do
+  theNick <- _nick <$> instanceConfig
+  tvarI   <- instanceConfigTVar
+
+  case (_source ev, _message ev) of
+    (Channel _ c, Kick n _) | n == theNick -> liftIO . atomically $ delChan tvarI c
+                            | otherwise   -> return ()
+    _ -> return ()
+
 -- *Utilities
 
 -- |Update the nick in the instance configuration and also send an
 -- update message to the server.
 setNick :: Text -> IRC ()
 setNick new = do
-  iconf <- instanceConfig
-  putInstanceConfig iconf { _nick = new }
+  tvarI <- instanceConfigTVar
+
+  liftIO . atomically $ do
+    iconf <- readTVar tvarI
+    writeTVar tvarI iconf { _nick = new }
+
   send $ nick new
+
+-- |Update the channel list in the instance configuration and also
+-- part the channel.
+leaveChannel :: Text -> Maybe Text -> IRC ()
+leaveChannel chan reason = do
+  tvarI <- instanceConfigTVar
+  liftIO . atomically $ delChan tvarI chan
+
+  send $ part chan reason
+
+-- |Remove a channel from the list.
+delChan :: TVar InstanceConfig -> Text -> STM ()
+delChan tvarI chan = do
+  iconf <- readTVar tvarI
+  writeTVar tvarI iconf { _channels = filter (/=chan) $ _channels iconf }
