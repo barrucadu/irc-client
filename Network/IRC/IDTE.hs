@@ -15,6 +15,7 @@ module Network.IRC.IDTE
     , defaultDisconnectHandler
     , setNick
     , leaveChannel
+    , reply
     ) where
 
 import Control.Applicative    ((<$>))
@@ -374,3 +375,10 @@ delChan :: TVar InstanceConfig -> Text -> STM ()
 delChan tvarI chan = do
   iconf <- readTVar tvarI
   writeTVar tvarI iconf { _channels = filter (/=chan) $ _channels iconf }
+
+-- |Send a message to the source of an event.
+reply :: Event -> Text -> IRC ()
+reply ev txt = case _source ev of
+                 Channel _ c -> send $ privmsg c txt
+                 User n      -> send $ query n txt
+                 _           -> return ()
