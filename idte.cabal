@@ -10,7 +10,7 @@ name:                idte
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.1.5.0
+version:             0.2.0.0
 
 -- A short (one-line) description of the package.
 synopsis:            An IRC client library providing SSL.
@@ -52,13 +52,10 @@ cabal-version:       >=1.10
 library
   -- Modules exported by the library.
   exposed-modules:     Network.IRC.IDTE
-                     , Network.IRC.IDTE.Events
-                     , Network.IRC.IDTE.Messages
                      , Network.IRC.IDTE.Types
   
   -- Modules included in this library but not exported.
-  other-modules:       Network.IRC.IDTE.Utils
-                     , Network.IRC.IDTE.Net
+  -- other-modules:       
   
   -- Compile with -Wall by default
   ghc-options:         -Wall
@@ -70,16 +67,14 @@ library
   -- Other library packages from which modules are imported.
   build-depends:       base         >=4.7 && <5
                      , bytestring   >=0.10
-                     , cprng-aes    >=0.5
-                     , data-default >=0.5
-                     , x509-validation >=1.5
-                     , irc          >=0.6
-                     , irc-ctcp     >=0.1
-                     , network      >=2.5
-                     , text         >=1.1
+                     , conduit      >=1.2
+                     , data-default-class >=0.0.1
+                     , irc-conduit  >=0.1
+                     , irc-ctcp     >=0.1.2
                      , stm          >=2.4
+                     , stm-conduit  >=2.5
+                     , text         >=1.1
                      , time         >=1.4
-                     , tls          >=1.2
                      , transformers >=0.4
                      , old-locale   >=1.0
   

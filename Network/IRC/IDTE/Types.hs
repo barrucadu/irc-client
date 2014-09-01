@@ -1,41 +1,31 @@
+{-# LANGUAGE ImpredicativeTypes #-}
+
 -- |Types for IRC clients, because GHC doesn't do recursive modules
 -- well.
 module Network.IRC.IDTE.Types
-    ( -- *State
-      IRC
-    , IRCState
-    , ConnectionConfig(..)
-    , InstanceConfig(..)
-    , newIRCState
-    , ircState
-    , getConnectionConfig
-    , getInstanceConfig
-    , getInstanceConfig'
-    , connectionConfig
-    , instanceConfigTVar
-    , instanceConfig
-    , putInstanceConfig
-    , withLock
+    ( module Network.IRC.IDTE.Types
 
-    -- *Events
+    -- *Re-exported
     , Event(..)
-    , EventType(..)
-    , EventHandler(..)
     , Source(..)
-    , IrcMessage(..)
+    , Message(..)
     ) where
 
 import Control.Applicative        ((<$>))
-import Control.Concurrent.MVar    (MVar, newMVar, withMVar)
 import Control.Concurrent.STM     (TVar, atomically, readTVar, newTVar, writeTVar)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (ReaderT, ask)
+import Data.ByteString            (ByteString)
+import Data.Conduit               (Consumer, Producer)
+import Data.Conduit.TMChan        (TBMChan)
 import Data.Text                  (Text)
-import Data.Time.Clock            (UTCTime)
-import Network                    (HostName)
-import Network.Socket             (Socket)
-import Network.IRC                (Message)
-import Network.TLS                (Context)
+import Data.Time.Clock            (NominalDiffTime)
+import Network.IRC.Conduit        (Event(..), Message(..), Source(..), IrcEvent, IrcMessage)
+
+-- *Type synonyms
+type UnicodeEvent   = Event Text
+type UnicodeSource  = Source Text
+type UnicodeMessage = Message Text
 
 -- *State
 
@@ -47,19 +37,15 @@ data IRCState = IRCState { _connectionConfig :: ConnectionConfig
                          -- ^Read-only connection configuration
                          , _instanceConfig   :: TVar InstanceConfig
                          -- ^Mutable instance configuration in STM
-                         , _globalLock       :: MVar ()
-                         -- ^Lock for atomic operations
                          }
 
 -- |Construct a new IRC state
 newIRCState :: MonadIO m => ConnectionConfig -> InstanceConfig -> m IRCState
 newIRCState cconf iconf = do
   tvar <- liftIO . atomically . newTVar $ iconf
-  mvar <- liftIO . newMVar $ ()
 
   return IRCState { _connectionConfig = cconf
                   , _instanceConfig   = tvar
-                  , _globalLock       = mvar
                   }
 
 -- |Access the entire state.
@@ -96,23 +82,18 @@ instanceConfig = instanceConfigTVar >>= liftIO . atomically . readTVar
 putInstanceConfig :: InstanceConfig -> IRC ()
 putInstanceConfig iconf = instanceConfigTVar >>= liftIO . atomically . flip writeTVar iconf
 
--- |Run a function atomically with respect to the global lock. This
--- blocks until the lock is free.
-withLock :: IO a -> IRC a
-withLock f = do
-  mvar <- _globalLock <$> ask
-  liftIO $ withMVar mvar (const f)
-
 -- |The state of an IRC server connection
 data ConnectionConfig = ConnectionConfig
-    { _socket     :: Socket
-    -- ^Server connection socket
-    , _tls        :: Maybe Context
-    -- ^TLS context, if TLS was used.
-    , _server     :: HostName
+    { _func       :: Int -> ByteString -> IO () -> Consumer IrcEvent IO () -> Producer IO IrcMessage -> IO ()
+    -- ^Function to connect and start the conduits.
+    , _sendqueue  :: TBMChan IrcMessage
+    -- ^Message send queue
+    , _server     :: ByteString
     -- ^The server host
     , _port       :: Int
     -- ^The server port
+    , _flood      :: NominalDiffTime
+    -- ^The minimum time between two adjacent messages.
     , _disconnect :: IRC ()
     -- ^Action to run if the remote server closes the connection.
     }
@@ -129,34 +110,11 @@ data InstanceConfig = InstanceConfig
     -- ^Current channels
     , _ctcpVer  :: Text
     -- ^Response to CTCP VERSION
-    , _floodDelay :: Int
-    -- ^Number of seconds to wait between sends
-    , _lastMessageTime :: UTCTime
-    -- ^The time of the last message (will be some time in the past
-    -- upon initialisation). This is used for flood control and should
-    -- NOT be updated by the user.
     , _eventHandlers :: [EventHandler]
     -- ^The registered event handlers
     }
 
 -- *Events
-
--- |An event has a message, some information on the source, and a
--- reply function.
-data Event = Event
-    { _rawMessage :: Message
-    -- ^The original message, split into parts and nothing more.
-    , _eventType  :: EventType
-    -- ^The type of the event, as registered by event handlers.
-    , _source     :: Source
-    -- ^The source of the message.
-    , _message    :: IrcMessage
-    -- ^The message data, split into a sum type.
-    , _reply      :: IrcMessage -> IRC ()
-    -- ^Sends a message to the source of this event.
-    , _send       :: Source -> IrcMessage -> IRC ()
-    -- ^Send a message
-    }
 
 -- |Types of events which can be caught.
 data EventType = EEverything
@@ -172,78 +130,27 @@ data EventHandler = EventHandler
     -- ^A description of the event handler
     , _matchType   :: EventType
     -- ^Which type to be triggered by
-    , _eventFunc   :: Event -> IRC ()
+    , _eventFunc   :: UnicodeEvent -> IRC ()
     -- ^The function to call
     }
 
--- |The source of a message.
-data Source = Server
-            -- ^The message comes from the server.
-            | Channel Text Text
-            -- ^A channel the client is in. The first Text is the
-            -- nick, the second, the channel name.
-            | User Text
-            -- ^A query from a user.
-            | UnknownSource
-            -- ^The source could not be determined, see the raw
-            -- message
-            deriving (Eq, Show)
+-- |Get the type of an event.
+eventType :: Event a -> EventType
+eventType e = case _message e of
+                (Privmsg _ Right{}) -> EPrivmsg
+                (Privmsg _ Left{})  -> ECTCP
+                (Notice  _ Right{}) -> ENotice
+                (Notice  _ Left{})  -> ECTCP
 
--- |A decoded message
-data IrcMessage = Privmsg Text
-                -- ^The client has received a message, which may be to
-                -- a channel it's in.
-                --
-                -- CTCPs will, however, not raise this event (despite
-                -- being sent as a PRIVMSG).
+                Nick{}    -> ENick
+                Join{}    -> EJoin
+                Part{}    -> EPart
+                Quit{}    -> EQuit
+                Mode{}    -> EMode
+                Topic{}   -> ETopic
+                Invite{}  -> EInvite
+                Kick{}    -> EKick
+                Ping{}    -> EPing
+                Numeric{} -> ENumeric
 
-                | Notice Text
-                -- ^Like a PRIVMSG, except an automatic reply must
-                -- *not* be generated.
-
-                | CTCP Text [Text]
-                -- ^A CTCP has been received.
-
-                | Nick Text
-                -- ^Someone has updated their nick. The given nickname
-                -- is the new one.
-
-                | Join Text
-                -- ^Someone has joined a channel the client is in.
-
-                | Part Text (Maybe Text)
-                -- ^Someone has left a channel the client is in.
-
-                | Quit Text (Maybe Text)
-                -- ^Someone has quit a channel the client is in.
-
-                | Mode Bool [Text] [Text]
-                -- ^Some mode changes have been applied to a channel
-                -- the client is in, or a user in a channel the client
-                -- is in.
-
-                | Topic Text
-                -- ^The topic of a channel the client is in has been
-                -- updated.
-
-                | Invite Text Text
-                -- ^The client has been invited to a channel. The
-                -- first text is the nick of the inviter.
-
-                | Kick Text (Maybe Text)
-                -- ^Someone has been kicked from a channel the client
-                -- is in.
-
-                | Ping Text
-                -- ^A ping has been received (probably from the
-                -- server, due to a period of inactivity). The Text is
-                -- where the PONG should be sent.
-
-                | Numeric Int [Text]
-                -- ^One of the many numeric codes has been received in
-                -- response to something the client did.
-
-                | UnknownMessage
-                -- ^The message could not be decoded, see the raw
-                -- message.
-                deriving (Eq, Show)
+                _ -> EEverything
