@@ -22,13 +22,12 @@ module Network.IRC.IDTE
 
 import Control.Applicative        ((<$>))
 import Control.Arrow              (first)
-import Control.Concurrent         (forkIO, threadDelay)
+import Control.Concurrent         (forkIO)
 import Control.Concurrent.STM     (STM, TVar, atomically, readTVar, retry, writeTVar)
 import Control.Monad              (unless)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
-import Data.ByteString.Char8      (unpack)
 import Data.Char                  (isAlphaNum)
 import Data.Conduit               (Producer, Conduit, Consumer, ($=), (=$), awaitForever, toProducer, yield)
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
@@ -108,8 +107,8 @@ runner = do
 
   dchandler <- _disconnect <$> connectionConfig
 
-  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit False id
-  let sink   = logConduit True _message =$ eventSink state
+  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit False toByteString
+  let sink   = logConduit True _raw =$ eventSink state
 
   liftIO $ func port server initialise sink source
 
@@ -130,7 +129,7 @@ getHandlersFor :: Event a -> [EventHandler] -> [UnicodeEvent -> IRC ()]
 getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _matchType eh `elem` [EEverything, eventType e]]
 
 -- |A conduit which logs everything which goes through it.
-logConduit :: MonadIO m => Bool -> (a -> IrcMessage) -> Conduit a m a
+logConduit :: MonadIO m => Bool -> (a -> ByteString) -> Conduit a m a
 logConduit fromsrv f = awaitForever $ \x -> do
   -- Print the log
   liftIO $ do
@@ -138,7 +137,7 @@ logConduit fromsrv f = awaitForever $ \x -> do
 
     putStrLn $ unwords [ formatTime defaultTimeLocale "%c" now
                        , if fromsrv then "<---" else "--->"
-                       , unpack . toByteString $ f x
+                       , init . tail . show $ f x
                        ]
 
   -- And pass the message on
