@@ -38,7 +38,7 @@ import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
 import Data.Time.Clock            (NominalDiffTime, getCurrentTime)
 import Data.Time.Format           (formatTime)
 import Network.IRC.CTCP           (fromCTCP, toCTCP)
-import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, ircClient, ircTlsClient, rawMessage, toByteString)
+import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, ircClient, ircTLSClient, rawMessage, toByteString)
 import Network.IRC.IDTE.Types
 import System.Locale              (defaultTimeLocale)
 
@@ -52,7 +52,7 @@ connect = connect' ircClient
 
 -- |Connect to a server with TLS.
 connectWithTLS :: MonadIO m => ByteString -> Int -> NominalDiffTime -> m ConnectionConfig
-connectWithTLS = connect' ircTlsClient
+connectWithTLS = connect' ircTLSClient
 
 -- |Connect to a server
 connect' :: MonadIO m => (Int -> ByteString -> IO () -> Consumer IrcEvent IO () -> Producer IO IrcMessage -> IO ()) -> ByteString -> Int -> NominalDiffTime -> m ConnectionConfig
