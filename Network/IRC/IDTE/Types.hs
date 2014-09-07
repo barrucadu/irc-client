@@ -84,7 +84,7 @@ putInstanceConfig iconf = instanceConfigTVar >>= liftIO . atomically . flip writ
 
 -- |The state of an IRC server connection
 data ConnectionConfig = ConnectionConfig
-    { _func       :: Int -> ByteString -> IO () -> Consumer IrcEvent IO () -> Producer IO IrcMessage -> IO ()
+    { _func       :: Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
     -- ^Function to connect and start the conduits.
     , _sendqueue  :: TBMChan IrcMessage
     -- ^Message send queue

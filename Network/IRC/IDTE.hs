@@ -29,7 +29,7 @@ import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import Data.Char                  (isAlphaNum)
-import Data.Conduit               (Producer, Conduit, Consumer, ($=), (=$), awaitForever, toProducer, yield)
+import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), awaitForever, toProducer, yield)
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
 import Data.Maybe                 (fromMaybe)
 import Data.Monoid                ((<>))
@@ -55,7 +55,7 @@ connectWithTLS :: MonadIO m => ByteString -> Int -> NominalDiffTime -> m Connect
 connectWithTLS = connect' ircTLSClient
 
 -- |Connect to a server
-connect' :: MonadIO m => (Int -> ByteString -> IO () -> Consumer IrcEvent IO () -> Producer IO IrcMessage -> IO ()) -> ByteString -> Int -> NominalDiffTime -> m ConnectionConfig
+connect' :: MonadIO m => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()) -> ByteString -> Int -> NominalDiffTime -> m ConnectionConfig
 connect' f host port flood = liftIO $ do
   queueS <- newTBMChanIO 16
 
@@ -108,12 +108,19 @@ runner = do
   dchandler <- _disconnect <$> connectionConfig
 
   let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit False toByteString
-  let sink   = logConduit True _raw =$ eventSink state
+  let sink   = forgetful =$= logConduit True _raw =$ eventSink state
 
   liftIO $ func port server initialise sink source
 
   disconnect
   dchandler
+
+-- |Forget failed decodings
+forgetful :: Monad m => Conduit (Either a b) m b
+forgetful = awaitForever go
+  where
+    go (Left  _) = return ()
+    go (Right b) = yield b
 
 -- |Block on receiving a message and invoke all matching handlers
 -- simultaneously.
