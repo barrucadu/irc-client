@@ -13,13 +13,16 @@ name:                idte
 version:             0.2.0.0
 
 -- A short (one-line) description of the package.
-synopsis:            An IRC client library providing SSL.
+synopsis:            An IRC client library.
 
 -- A longer description of the package.
 -- description:         
 
 -- URL for the project homepage or repository.
-homepage:            https://github.com/barrucadu/yukibot
+homepage:            https://github.com/barrucadu/irc-client
+
+-- URL where users should direct bug reports.
+bug-reports:         https://github.com/barrucadu/irc-client/issues
 
 -- The license under which the package is released.
 license:             OtherLicense
