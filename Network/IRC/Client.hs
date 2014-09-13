@@ -1,9 +1,9 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
--- |Entry point to the Integrated Data Thought Entity.
-module Network.IRC.IDTE
-    ( module Network.IRC.IDTE.Types
+-- |Entry point to the client.
+module Network.IRC.Client
+    ( module Network.IRC.Client.Types
     , connect
     , connectWithTLS
     , start
@@ -39,7 +39,7 @@ import Data.Time.Clock            (NominalDiffTime, getCurrentTime)
 import Data.Time.Format           (formatTime)
 import Network.IRC.CTCP           (fromCTCP, toCTCP)
 import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, ircClient, ircTLSClient, rawMessage, toByteString)
-import Network.IRC.IDTE.Types
+import Network.IRC.Client.Types
 import System.Locale              (defaultTimeLocale)
 
 import qualified Data.Text as T

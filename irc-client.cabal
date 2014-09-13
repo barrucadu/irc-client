@@ -2,7 +2,7 @@
 -- see http://haskell.org/cabal/users-guide/
 
 -- The name of the package.
-name:                idte
+name:                irc-client
 
 -- The package version.  See the Haskell package versioning policy (PVP) 
 -- for standards guiding when and how versions should be incremented.
@@ -54,8 +54,8 @@ cabal-version:       >=1.10
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Network.IRC.IDTE
-                     , Network.IRC.IDTE.Types
+  exposed-modules:     Network.IRC.Client
+                     , Network.IRC.Client.Types
   
   -- Modules included in this library but not exported.
   -- other-modules:       

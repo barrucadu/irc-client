@@ -2,8 +2,8 @@
 
 -- |Types for IRC clients, because GHC doesn't do recursive modules
 -- well.
-module Network.IRC.IDTE.Types
-    ( module Network.IRC.IDTE.Types
+module Network.IRC.Client.Types
+    ( module Network.IRC.Client.Types
 
     -- *Re-exported
     , Event(..)

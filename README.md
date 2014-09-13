@@ -1,4 +1,4 @@
-# idte: IRC client library
+# irc-client: IRC client library
 
  - Built on [irc-conduit][].
 
