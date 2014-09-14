@@ -10,7 +10,7 @@ name:                irc-client
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.2.0.0
+version:             0.2.1.0
 
 -- A short (one-line) description of the package.
 synopsis:            An IRC client library.
@@ -55,10 +55,12 @@ cabal-version:       >=1.10
 library
   -- Modules exported by the library.
   exposed-modules:     Network.IRC.Client
+                     , Network.IRC.Client.Handlers
                      , Network.IRC.Client.Types
+                     , Network.IRC.Client.Utils
   
   -- Modules included in this library but not exported.
-  -- other-modules:       
+  other-modules:       Network.IRC.Client.Internal
   
   -- Compile with -Wall by default
   ghc-options:         -Wall
