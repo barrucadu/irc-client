@@ -112,6 +112,9 @@ data InstanceConfig = InstanceConfig
     -- ^Response to CTCP VERSION
     , _eventHandlers :: [EventHandler]
     -- ^The registered event handlers
+    , _ignore   :: [(Text, Maybe Text)]
+    -- ^List of nicks (optionally restricted to channels) to ignore
+    -- messages from. No channel = global.
     }
 
 -- *Events

@@ -8,7 +8,7 @@ module Network.IRC.Client.Internal where
 
 import Control.Applicative        ((<$>))
 import Control.Concurrent         (forkIO)
-import Control.Concurrent.STM     (atomically, retry)
+import Control.Concurrent.STM     (atomically, readTVar, retry)
 import Control.Monad              (unless)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
@@ -93,10 +93,23 @@ forgetful = awaitForever go
 -- simultaneously.
 eventSink :: MonadIO m => IRCState -> Consumer IrcEvent m ()
 eventSink ircstate = awaitForever $ \event -> do
-  let event' = decodeUtf8 <$> event
+  let event'  = decodeUtf8 <$> event
+  ignored <- isIgnored ircstate event'
+  unless ignored $ do
+    handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
+    liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
 
-  handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
-  liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
+-- |Check if an event is ignored or not.
+isIgnored :: MonadIO m => IRCState -> UnicodeEvent -> m Bool
+isIgnored ircstate ev = do
+  iconf <- liftIO . atomically . readTVar . _instanceConfig $ ircstate
+  let ignoreList = _ignore iconf
+
+  return $
+    case _source ev of
+      User      n ->  (n, Nothing) `elem` ignoreList
+      Channel c n -> ((n, Nothing) `elem` ignoreList) || ((n, Just c) `elem` ignoreList)
+      Server  _   -> False
 
 -- |Get the event handlers for an event.
 getHandlersFor :: Event a -> [EventHandler] -> [UnicodeEvent -> IRC ()]
