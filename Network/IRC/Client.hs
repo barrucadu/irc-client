@@ -19,6 +19,8 @@ module Network.IRC.Client
     , module Network.IRC.Client.Types
     -- *Utilities
     , module Network.IRC.Client.Utils
+    , rawMessage
+    , toByteString
     ) where
 
 import Control.Monad.IO.Class     (MonadIO, liftIO)
@@ -26,11 +28,11 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import Data.Text                  (Text)
 import Data.Time.Clock            (NominalDiffTime)
-import Network.IRC.Conduit        (ircClient, ircTLSClient)
-import Network.IRC.Client.Internal
 import Network.IRC.Client.Handlers
+import Network.IRC.Client.Internal
 import Network.IRC.Client.Types
 import Network.IRC.Client.Utils
+import Network.IRC.Conduit        (ircClient, ircTLSClient, rawMessage, toByteString)
 
 -- *Connecting to an IRC network
 
@@ -64,4 +66,5 @@ defaultIRCConf n = InstanceConfig
                      , _channels      = []
                      , _ctcpVer       = "irc-client-0.2.1.0"
                      , _eventHandlers = defaultEventHandlers
+                     , _ignore        = []
                      }
