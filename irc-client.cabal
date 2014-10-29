@@ -10,7 +10,7 @@ name:                irc-client
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.2.2.1
+version:             0.2.2.2
 
 -- A short (one-line) description of the package.
 synopsis:            An IRC client library.
@@ -74,7 +74,7 @@ library
                      , bytestring   >=0.10
                      , conduit      >=1.2
                      , data-default-class >=0.0.1
-                     , irc-conduit  >=0.1.0.1
+                     , irc-conduit  >=0.1.1
                      , irc-ctcp     >=0.1.2
                      , stm          >=2.4
                      , stm-conduit  >=2.5
