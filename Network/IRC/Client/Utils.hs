@@ -8,6 +8,8 @@ import Network.IRC.CTCP            (toCTCP)
 import Network.IRC.Client.Internal (send)
 import Network.IRC.Client.Types
 
+import qualified Data.Text as T
+
 -- |Update the nick in the instance configuration and also send an
 -- update message to the server.
 setNick :: Text -> IRC ()
@@ -38,8 +40,8 @@ delChan tvarI chan = do
 -- |Send a message to the source of an event.
 reply :: UnicodeEvent -> Text -> IRC ()
 reply ev txt = case _source ev of
-                 Channel c _ -> send $ Privmsg c $ Right txt
-                 User n      -> send $ Privmsg n $ Right txt
+                 Channel c _ -> mapM_ (send . Privmsg c . Right) $ T.lines txt
+                 User n      -> mapM_ (send . Privmsg n . Right) $ T.lines txt
                  _           -> return ()
 
 -- |Construct a privmsg containing a CTCP
