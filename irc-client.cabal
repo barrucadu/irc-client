@@ -10,13 +10,26 @@ name:                irc-client
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.2.2.2
+version:             0.2.3.1
 
 -- A short (one-line) description of the package.
 synopsis:            An IRC client library.
 
 -- A longer description of the package.
--- description:         
+description:
+  An IRC client library built atop
+  <http://hackage.haskell.org/package/irc-conduit irc-conduit>. Why
+  another IRC client library, you cry? I didn't really find one that
+  did what I wanted (specifically, handle connecting to servers and
+  calling event handlers, possibly with TLS), but which didn't
+  implement almost a full IRC bot for you. That takes out all the fun!
+  .
+  <http://hackage.haskell.org/package/irc-conduit irc-conduit> and
+  <http://hackage.haskell.org/package/irc-ctcp irc-ctcp> are my
+  solution to the first part of that, this is my solution to the
+  latter. It's a simple IRC client library that does the basics for
+  you, but isn't an all-singing, all-dancing, fully-featured IRC
+  /application/. It is a merely a simple library.
 
 -- URL for the project homepage or repository.
 homepage:            https://github.com/barrucadu/irc-client

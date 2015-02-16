@@ -1,18 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |Default event handlers
+-- | The default event handlers. Handlers are invoked concurrently
+-- when matching events are received from the server.
 module Network.IRC.Client.Handlers
-    ( -- *Event handlers
-      defaultEventHandlers
-    , pingHandler
-    , ctcpPingHandler
-    , ctcpVersionHandler
-    , ctcpTimeHandler
-    , welcomeNick
-    , nickMangler
-    -- *Misc
-    , defaultDisconnectHandler
-    ) where
+  ( -- * Event handlers
+    defaultEventHandlers
+  , pingHandler
+  , ctcpPingHandler
+  , ctcpVersionHandler
+  , ctcpTimeHandler
+  , welcomeNick
+  , nickMangler
+
+  -- * Disconnect handlers
+  , defaultDisconnectHandler
+  ) where
 
 import Control.Applicative    ((<$>))
 import Control.Arrow          (first)
@@ -33,59 +35,75 @@ import System.Locale          (defaultTimeLocale)
 
 import qualified Data.Text as T
 
--- *Event handlers
+-- * Event handlers
 
+-- | The default event handlers, the following are included:
+--
+-- - respond to server @PING@ messages with a @PONG@;
+-- - respond to CTCP @PING@ requests with a CTCP @PONG@;
+-- - respond to CTCP @VERSION@ requests with the version string;
+-- - respond to CTCP @TIME@ requests with the system time;
+-- - update the nick upon receiving the welcome message, in case the
+--   server modifies it;
+-- - mangle the nick if the server reports a collision;
+-- - update the channel list on @JOIN@ and @KICK@.
+--
+-- These event handlers are all exposed through the
+-- Network.IRC.Client.Handlers module, so you can use them directly if
+-- you are building up your 'InstanceConfig' from scratch.
+--
+-- If you are building a bot, you may want to write an event handler
+-- to process messages representing commands.
 defaultEventHandlers :: [EventHandler]
-defaultEventHandlers = [ EventHandler "Respond to server PING requests"  EPing pingHandler
-                       , EventHandler "Respond to CTCP PING requests"    ECTCP ctcpPingHandler
-                       , EventHandler "Respond to CTCP VERSION requests" ECTCP ctcpVersionHandler
-                       , EventHandler "Respond to CTCP TIME requests"    ECTCP ctcpTimeHandler
-                       , EventHandler "Update the nick upon welcome"     ENumeric welcomeNick
-                       , EventHandler "Mangle the nick on collision"     ENumeric nickMangler
-                       , EventHandler "Update the channel list on JOIN"  ENumeric joinHandler
-                       , EventHandler "Update the channel lift on KICK"  EKick    kickHandler
-                       ]
+defaultEventHandlers =
+  [ EventHandler "Respond to server PING requests"  EPing    pingHandler
+  , EventHandler "Respond to CTCP PING requests"    ECTCP    ctcpPingHandler
+  , EventHandler "Respond to CTCP VERSION requests" ECTCP    ctcpVersionHandler
+  , EventHandler "Respond to CTCP TIME requests"    ECTCP    ctcpTimeHandler
+  , EventHandler "Update the nick upon welcome"     ENumeric welcomeNick
+  , EventHandler "Mangle the nick on collision"     ENumeric nickMangler
+  , EventHandler "Update the channel list on JOIN"  ENumeric joinHandler
+  , EventHandler "Update the channel lift on KICK"  EKick    kickHandler
+  ]
 
--- |Respond to pings
+-- | Respond to server @PING@ messages with a @PONG@.
 pingHandler :: UnicodeEvent -> IRC ()
 pingHandler ev = case _message ev of
   Ping s1 s2 -> send . Pong $ fromMaybe s1 s2
   _ -> return ()
 
--- |Respond to CTCP PINGs
+-- | Respond to CTCP @PING@ requests with a CTCP @PONG@.
 ctcpPingHandler :: UnicodeEvent -> IRC ()
 ctcpPingHandler = ctcpHandler [("PING", return)]
 
--- |Respond to CTCP VERSIONs
+-- | Respond to CTCP @VERSION@ requests with the version string.
 ctcpVersionHandler :: UnicodeEvent -> IRC ()
-ctcpVersionHandler = ctcpHandler [("VERSION", go)]
-  where
-    go _ = do
-      ver <- _ctcpVer <$> instanceConfig
-      return [ver]
+ctcpVersionHandler = ctcpHandler [("VERSION", go)] where
+  go _ = do
+    ver <- _ctcpVer <$> instanceConfig
+    return [ver]
 
--- |Respond to CTCP TIMEs
+-- | Respond to CTCP @TIME@ requests with the system time.
 ctcpTimeHandler :: UnicodeEvent -> IRC ()
-ctcpTimeHandler = ctcpHandler [("TIME", go)]
-  where
-    go _ = do
-      now <- liftIO getCurrentTime
-      return [T.pack $ formatTime defaultTimeLocale "%c" now]
+ctcpTimeHandler = ctcpHandler [("TIME", go)] where
+  go _ = do
+    now <- liftIO getCurrentTime
+    return [T.pack $ formatTime defaultTimeLocale "%c" now]
 
--- |Update the nick upon welcome, as it may not be what we requested
--- (eg, in the case of a nick too long).
+-- | Update the nick upon welcome (numeric reply 001), as it may not
+-- be what we requested (eg, in the case of a nick too long).
 welcomeNick :: UnicodeEvent -> IRC ()
-welcomeNick = numHandler [(001, go)]
-  where
-    go (srvNick:_) = do
-      tvarI <- instanceConfigTVar
+welcomeNick = numHandler [(001, go)] where
+  go (srvNick:_) = do
+    tvarI <- instanceConfigTVar
 
-      liftIO . atomically $ do
-        iconf <- readTVar tvarI
-        writeTVar tvarI iconf { _nick = srvNick }
-    go _ = return ()
+    liftIO . atomically $ do
+      iconf <- readTVar tvarI
+      writeTVar tvarI iconf { _nick = srvNick }
+  go _ = return ()
 
--- |Mangle the nick if there's a collision when we set it
+-- | Mangle the nick if there's a collision (numeric replies 432, 433,
+-- and 436) when we set it
 nickMangler :: UnicodeEvent -> IRC ()
 nickMangler = numHandler [ (432, go fresh)
                          , (433, go mangle)
@@ -139,21 +157,21 @@ nickMangler = numHandler [ (432, go fresh)
       _ -> transform trs txt
     transform [] _ = Nothing
 
--- |Upon receiving a RPL_TOPIC, add the channel to the list (if not
--- already present).
+-- | Upon receiving a channel topic (numeric reply 332), add the
+-- channel to the list (if not already present).
 joinHandler :: UnicodeEvent -> IRC ()
-joinHandler = numHandler [(332, go)]
-  where
-    go (c:_) = do
-      tvarI <- instanceConfigTVar
+joinHandler = numHandler [(332, go)] where
+  go (c:_) = do
+    tvarI <- instanceConfigTVar
 
-      liftIO . atomically $ do
-        iconf <- readTVar tvarI
-        unless (c `elem` _channels iconf) $
-          writeTVar tvarI iconf { _channels = c : _channels iconf }
-    go _ = return ()
+    liftIO . atomically $ do
+      iconf <- readTVar tvarI
+      unless (c `elem` _channels iconf) $
+        writeTVar tvarI iconf { _channels = c : _channels iconf }
 
--- |Update the channel list upon being kicked.
+  go _ = return ()
+
+-- | Update the channel list upon being kicked.
 kickHandler :: UnicodeEvent -> IRC ()
 kickHandler ev = do
   theNick <- _nick <$> instanceConfig
@@ -166,34 +184,32 @@ kickHandler ev = do
 
 -- *Misc
 
--- |The default disconnect handler: do nothing.
+-- | The default disconnect handler: do nothing. You might want to
+-- override this with one which reconnects.
 defaultDisconnectHandler :: IRC ()
 defaultDisconnectHandler = return ()
 
 -- *Utils
 
--- |Match and handle a named CTCP
+-- | Match and handle a named CTCP
 ctcpHandler :: [(Text, [Text] -> IRC [Text])] -> UnicodeEvent -> IRC ()
-ctcpHandler hs ev = 
-  case (_source ev, _message ev) of
-    (User n, Privmsg _ (Left ctcpbs)) ->
-      let
-        (verb, xs) = first toUpper $ fromCTCP ctcpbs
-      in
-        case lookup verb hs of
-          Just f -> do
-            args <- f xs
-            send $ ctcpReply n verb args
-          _ -> return ()
-    _ -> return ()
+ctcpHandler hs ev = case (_source ev, _message ev) of
+  (User n, Privmsg _ (Left ctcpbs)) ->
+    let (verb, xs) = first toUpper $ fromCTCP ctcpbs
+    in case lookup verb hs of
+         Just f -> do
+           args <- f xs
+           send $ ctcpReply n verb args
+         _ -> return ()
+  _ -> return ()
 
--- |Match and handle a numeric reply
+-- | Match and handle a numeric reply
 numHandler :: [(Int, [Text] -> IRC ())] -> UnicodeEvent -> IRC ()
 numHandler hs ev = case _message ev of
   Numeric num xs -> maybe (return ()) ($xs) $ lookup num hs
   _ -> return ()
 
--- |Break some text on the first occurrence of a substring, removing
+-- | Break some text on the first occurrence of a substring, removing
 -- the substring from the second portion.
 breakOn' :: Text -> Text -> Maybe (Text, Text)
 breakOn' delim txt = if T.length after >= T.length delim
