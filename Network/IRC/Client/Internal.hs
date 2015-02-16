@@ -1,8 +1,8 @@
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
--- |Most of the hairy code. This isn't all internal, due to messy
--- dependencies, but I've tried to make this as "internal" as
+-- | Most of the hairy code. This isn't all internal, due to messy
+-- dependencies, but I've tried to make this as \"internal\" as
 -- reasonably possible.
 module Network.IRC.Client.Internal where
 
@@ -22,9 +22,9 @@ import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, rawMess
 import Network.IRC.Client.Types
 import System.Locale              (defaultTimeLocale)
 
--- *Connecting to an IRC network
+-- * Connecting to an IRC network
 
--- |Connect to a server
+-- | Connect to a server using the supplied connection function.
 connect' :: MonadIO m
          => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
          -> IRC ()
@@ -36,17 +36,17 @@ connect' f dcHandler host port flood = liftIO $ do
   queueS <- newTBMChanIO 16
 
   return ConnectionConfig
-             { _func       = f
-             , _sendqueue  = queueS
-             , _server     = host
-             , _port       = port
-             , _flood      = flood
-             , _disconnect = dcHandler
-             }
+    { _func       = f
+    , _sendqueue  = queueS
+    , _server     = host
+    , _port       = port
+    , _flood      = flood
+    , _disconnect = dcHandler
+    }
 
--- *Event loop
+-- * Event loop
 
--- |The event loop.
+-- | The event loop.
 runner :: IRC ()
 runner = do
   state <- ircState
@@ -56,6 +56,7 @@ runner = do
   theUser <- _username <$> instanceConfig
   theReal <- _realname <$> instanceConfig
 
+  -- Initialise the IRC session
   let initialise = flip runReaderT state $ do
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
         send $ Nick theNick
@@ -82,15 +83,14 @@ runner = do
   disconnect
   dchandler
 
--- |Forget failed decodings
+-- | Forget failed decodings.
 forgetful :: Monad m => Conduit (Either a b) m b
-forgetful = awaitForever go
-  where
-    go (Left  _) = return ()
-    go (Right b) = yield b
+forgetful = awaitForever go where
+  go (Left  _) = return ()
+  go (Right b) = yield b
 
--- |Block on receiving a message and invoke all matching handlers
--- simultaneously.
+-- | Block on receiving a message and invoke all matching handlers
+-- concurrently.
 eventSink :: MonadIO m => IRCState -> Consumer IrcEvent m ()
 eventSink ircstate = awaitForever $ \event -> do
   let event'  = decodeUtf8 <$> event
@@ -99,7 +99,7 @@ eventSink ircstate = awaitForever $ \event -> do
     handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
     liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
 
--- |Check if an event is ignored or not.
+-- | Check if an event is ignored or not.
 isIgnored :: MonadIO m => IRCState -> UnicodeEvent -> m Bool
 isIgnored ircstate ev = do
   iconf <- liftIO . atomically . readTVar . _instanceConfig $ ircstate
@@ -130,23 +130,23 @@ logConduit fromsrv f = awaitForever $ \x -> do
   -- And pass the message on
   yield x
 
--- *Messaging
+-- * Messaging
 
--- |Send a message as UTF-8, using TLS if enabled. This blocks if
+-- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
 send :: UnicodeMessage -> IRC ()
 send = sendBS . fmap encodeUtf8
 
--- |Send a message, using TLS if enabled. This blocks if messages are
+-- | Send a message, using TLS if enabled. This blocks if messages are
 -- sent too rapidly.
 sendBS :: IrcMessage -> IRC ()
 sendBS msg = do
   queue <- _sendqueue <$> connectionConfig
   liftIO . atomically $ writeTBMChan queue msg
 
--- *Disconnecting
+-- * Disconnecting
 
--- |Disconnect from a server, properly tearing down the TLS session
+-- | Disconnect from the server, properly tearing down the TLS session
 -- (if there is one).
 disconnect :: IRC ()
 disconnect = do
@@ -160,7 +160,7 @@ disconnect = do
   -- Then close the connection
   disconnectNow
 
--- |Disconnect immediately, without waiting for messages to be sent
+-- | Disconnect immediately, without waiting for messages to be sent.
 disconnectNow :: IRC ()
 disconnectNow = do
   queueS <- _sendqueue <$> connectionConfig

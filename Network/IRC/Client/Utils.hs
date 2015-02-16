@@ -8,8 +8,9 @@ import Network.IRC.CTCP            (toCTCP)
 import Network.IRC.Client.Internal (send)
 import Network.IRC.Client.Types
 
--- |Update the nick in the instance configuration and also send an
--- update message to the server.
+-- | Update the nick in the instance configuration and also send an
+-- update message to the server. This doesn't attempt to resolve nick
+-- collisions, that's up to the event handlers.
 setNick :: Text -> IRC ()
 setNick new = do
   tvarI <- instanceConfigTVar
@@ -20,7 +21,7 @@ setNick new = do
 
   send $ Nick new
 
--- |Update the channel list in the instance configuration and also
+-- | Update the channel list in the instance configuration and also
 -- part the channel.
 leaveChannel :: Text -> Maybe Text -> IRC ()
 leaveChannel chan reason = do
@@ -29,23 +30,25 @@ leaveChannel chan reason = do
 
   send $ Part chan reason
 
--- |Remove a channel from the list.
+-- | Remove a channel from the list without sending a part command (be
+-- careful not to let the channel list get out of sync with the
+-- real-world state if you use it for anything!)
 delChan :: TVar InstanceConfig -> Text -> STM ()
 delChan tvarI chan = do
   iconf <- readTVar tvarI
   writeTVar tvarI iconf { _channels = filter (/=chan) $ _channels iconf }
 
--- |Send a message to the source of an event.
+-- | Send a message to the source of an event.
 reply :: UnicodeEvent -> Text -> IRC ()
 reply ev txt = case _source ev of
-                 Channel c _ -> send $ Privmsg c $ Right txt
-                 User n      -> send $ Privmsg n $ Right txt
-                 _           -> return ()
+  Channel c _ -> send $ Privmsg c $ Right txt
+  User n      -> send $ Privmsg n $ Right txt
+  _           -> return ()
 
--- |Construct a privmsg containing a CTCP
+-- | Construct a @PRIVMSG@ containing a CTCP
 ctcp :: Text -> Text -> [Text] -> UnicodeMessage
 ctcp t command args = Privmsg t . Left $ toCTCP command args
 
--- |Construct a notice containing a CTCP
+-- | Construct a @NOTICE@ containing a CTCP
 ctcpReply :: Text -> Text -> [Text] -> UnicodeMessage
 ctcpReply t command args = Notice t . Left $ toCTCP command args
