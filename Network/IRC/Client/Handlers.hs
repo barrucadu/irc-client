@@ -26,12 +26,11 @@ import Data.Maybe             (fromMaybe)
 import Data.Monoid            ((<>))
 import Data.Text              (Text, breakOn, takeEnd, toUpper)
 import Data.Time.Clock        (getCurrentTime)
-import Data.Time.Format       (formatTime)
+import Data.Time.Format       (defaultTimeLocale, formatTime)
 import Network.IRC.CTCP       (fromCTCP)
 import Network.IRC.Client.Types
 import Network.IRC.Client.Utils
 import Network.IRC.Client.Internal
-import System.Locale          (defaultTimeLocale)
 
 import qualified Data.Text as T
 

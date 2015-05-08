@@ -92,9 +92,8 @@ library
                      , stm          >=2.4
                      , stm-conduit  >=2.5
                      , text         >=1.1
-                     , time         >=1.4
+                     , time         >=1.5
                      , transformers >=0.3
-                     , old-locale   >=1.0
   
   -- Directories containing source files.
   -- hs-source-dirs:      
