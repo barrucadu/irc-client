@@ -38,7 +38,7 @@ homepage:            https://github.com/barrucadu/irc-client
 bug-reports:         https://github.com/barrucadu/irc-client/issues
 
 -- The license under which the package is released.
-license:             OtherLicense
+license:             MIT
 
 -- The file containing the license text.
 license-file:        LICENSE
