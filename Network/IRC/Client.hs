@@ -19,6 +19,14 @@ module Network.IRC.Client
   , start
   , start'
 
+  -- * Logging
+  , Origin (..)
+  , connect'
+  , connectWithTLS'
+  , stdoutLogger
+  , fileLogger
+  , noopLogger
+
   -- * Interaction
   , send
   , sendBS
@@ -52,12 +60,53 @@ import Network.IRC.Conduit        (ircClient, ircTLSClient, rawMessage, toByteSt
 -- * Connecting to an IRC network
 
 -- | Connect to a server without TLS.
-connect :: MonadIO m => ByteString -> Int -> NominalDiffTime -> m ConnectionConfig
-connect = connect' ircClient defaultDisconnectHandler
+connect :: MonadIO m
+  => ByteString
+  -- ^ The hostname
+  -> Int
+  -- ^ The port
+  -> NominalDiffTime
+  -- ^ The flood cooldown
+  -> m ConnectionConfig
+connect = connect' noopLogger
 
 -- | Connect to a server with TLS.
-connectWithTLS :: MonadIO m => ByteString -> Int -> NominalDiffTime -> m ConnectionConfig
-connectWithTLS = connect' ircTLSClient defaultDisconnectHandler
+connectWithTLS :: MonadIO m
+  => ByteString
+  -- ^ The hostname
+  -> Int
+  -- ^ The port
+  -> NominalDiffTime
+  -- ^ The flood cooldown
+  -> m ConnectionConfig
+connectWithTLS = connectWithTLS' noopLogger
+
+-- | Connect to a server without TLS, with the provided logging
+-- function.
+connect' :: MonadIO m
+  => (Origin -> ByteString -> IO ())
+  -- ^ The message logger
+  -> ByteString
+  -- ^ The hostname
+  -> Int
+  -- ^ The port
+  -> NominalDiffTime
+  -- ^ The flood cooldown
+  -> m ConnectionConfig
+connect' = connectInternal ircClient defaultDisconnectHandler
+
+-- | Connect to a server with TLS, with the provided logging function.
+connectWithTLS' :: MonadIO m
+  => (Origin -> ByteString -> IO ())
+  -- ^ The message logger
+  -> ByteString
+  -- ^ The hostname
+  -> Int
+  -- ^ The port
+  -> NominalDiffTime
+  -- ^ The flood cooldown
+  -> m ConnectionConfig
+connectWithTLS' = connectInternal ircTLSClient defaultDisconnectHandler
 
 -- * Starting
 

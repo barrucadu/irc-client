@@ -24,14 +24,15 @@ import Network.IRC.Client.Types
 -- * Connecting to an IRC network
 
 -- | Connect to a server using the supplied connection function.
-connect' :: MonadIO m
-         => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
-         -> IRC ()
-         -> ByteString
-         -> Int
-         -> NominalDiffTime
-         -> m ConnectionConfig
-connect' f dcHandler host port flood = liftIO $ do
+connectInternal :: MonadIO m
+  => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
+  -> IRC ()
+  -> (Origin -> ByteString -> IO ())
+  -> ByteString
+  -> Int
+  -> NominalDiffTime
+  -> m ConnectionConfig
+connectInternal f dcHandler logf host port flood = liftIO $ do
   queueS <- newTBMChanIO 16
 
   return ConnectionConfig
@@ -41,6 +42,7 @@ connect' f dcHandler host port flood = liftIO $ do
     , _port       = port
     , _flood      = flood
     , _disconnect = dcHandler
+    , _logfunc    = logf
     }
 
 -- * Event loop
@@ -66,16 +68,17 @@ runner = do
   -- end closes the socket.
   flood  <- _flood     <$> connectionConfig
   func   <- _func      <$> connectionConfig
+  logf   <- _logfunc   <$> connectionConfig
   port   <- _port      <$> connectionConfig
-  server <- _server    <$> connectionConfig
   queue  <- _sendqueue <$> connectionConfig
+  server <- _server    <$> connectionConfig
 
   antiflood <- liftIO $ floodProtector flood
 
   dchandler <- _disconnect <$> connectionConfig
 
-  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit False toByteString
-  let sink   = forgetful =$= logConduit True _raw =$ eventSink state
+  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit (logf FromServer . toByteString)
+  let sink   = forgetful =$= logConduit (logf FromClient . _raw) =$ eventSink state
 
   liftIO $ func port server initialise sink source
 
@@ -115,19 +118,39 @@ getHandlersFor :: Event a -> [EventHandler] -> [UnicodeEvent -> IRC ()]
 getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _matchType eh `elem` [EEverything, eventType e]]
 
 -- |A conduit which logs everything which goes through it.
-logConduit :: MonadIO m => Bool -> (a -> ByteString) -> Conduit a m a
-logConduit fromsrv f = awaitForever $ \x -> do
-  -- Print the log
-  liftIO $ do
-    now <- getCurrentTime
-
-    putStrLn $ unwords [ formatTime defaultTimeLocale "%c" now
-                       , if fromsrv then "<---" else "--->"
-                       , init . tail . show $ f x
-                       ]
+logConduit :: MonadIO m => (a -> IO ()) -> Conduit a m a
+logConduit logf = awaitForever $ \x -> do
+  -- Call the logging function
+  liftIO $ logf x
 
   -- And pass the message on
   yield x
+
+-- | Print messages to stdout, with the current time.
+stdoutLogger :: Origin -> ByteString -> IO ()
+stdoutLogger origin x = do
+  now <- getCurrentTime
+
+  putStrLn $ unwords
+    [ formatTime defaultTimeLocale "%c" now
+    , if origin == FromServer then "<---" else "--->"
+    , init . tail $ show x
+    ]
+
+-- | Append messages to a file, with the current time.
+fileLogger :: FilePath -> Origin -> ByteString -> IO ()
+fileLogger fp origin x = do
+  now <- getCurrentTime
+
+  appendFile fp $ unwords
+    [ formatTime defaultTimeLocale "%c" now
+    , if origin == FromServer then "<---" else "--->"
+    , init . tail $ show x
+    ]
+
+-- | Do no logging.
+noopLogger :: a -> b -> IO ()
+noopLogger _ _ = return ()
 
 -- * Messaging
 

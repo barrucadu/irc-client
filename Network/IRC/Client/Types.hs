@@ -83,6 +83,10 @@ instanceConfig = instanceConfigTVar >>= liftIO . atomically . readTVar
 putInstanceConfig :: InstanceConfig -> IRC ()
 putInstanceConfig iconf = instanceConfigTVar >>= liftIO . atomically . flip writeTVar iconf
 
+-- | The origin of a message.
+data Origin = FromServer | FromClient
+  deriving (Eq, Read, Show)
+
 -- | The static state of an IRC server connection.
 data ConnectionConfig = ConnectionConfig
   { _func       :: Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
@@ -97,6 +101,8 @@ data ConnectionConfig = ConnectionConfig
   -- ^ The minimum time between two adjacent messages.
   , _disconnect :: IRC ()
   -- ^ Action to run if the remote server closes the connection.
+  , _logfunc    :: Origin -> ByteString -> IO ()
+  -- ^ Function to log messages sent to and received from the server.
   }
 
 -- | The updateable state of an IRC connection.
