@@ -89,10 +89,11 @@ library
                      , data-default-class >=0.0.1
                      , irc-conduit  >=0.1.1
                      , irc-ctcp     >=0.1.2
+                     , old-locale   >=1.0
                      , stm          >=2.4
                      , stm-conduit  >=2.5
                      , text         >=1.1
-                     , time         >=1.5
+                     , time         >=1.4
                      , transformers >=0.3
   
   -- Directories containing source files.

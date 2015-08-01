@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                #-}
 {-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
@@ -17,9 +18,15 @@ import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
 import Data.Time.Clock            (NominalDiffTime, getCurrentTime)
-import Data.Time.Format           (defaultTimeLocale, formatTime)
+import Data.Time.Format           (formatTime)
 import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
 import Network.IRC.Client.Types
+
+#if MIN_VERSION_time(1,5,0)
+import Data.Time.Format (defaultTimeLocale)
+#else
+import System.Locale    (defaultTimeLocale)
+#endif
 
 -- * Connecting to an IRC network
 
