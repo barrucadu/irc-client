@@ -1,8 +1,0 @@
-flags: {}
-packages:
-- '.'
-extra-deps:
-- irc-0.6.1.0
-- irc-conduit-0.1.1.2
-- irc-ctcp-0.1.2.1
-resolver: nightly-2015-07-30
