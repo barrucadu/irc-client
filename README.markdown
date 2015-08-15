@@ -36,8 +36,8 @@ Feel free to contact me on GitHub, through IRC (#haskell on freenode),
 or email (mike@barrucadu.co.uk).
 
 [irc-client]:   https://hackage.haskell.org/package/irc-client
-[build-status]: http://ci.barrucadu.co.uk/job/irc-client%20(lts)/badge/icon?style=plastic
-[build-log]:    http://ci.barrucadu.co.uk/job/irc-client%20(lts)/
+[build-status]: http://ci.barrucadu.co.uk/job/(irc-client)/job/irc-client/badge/icon?style=plastic
+[build-log]:    http://ci.barrucadu.co.uk/job/(irc-client)/job/irc-client/
 [docs]:         https://barrucadu.github.io/irc-client/
 [irc-conduit]:  https://hackage.haskell.org/package/irc-conduit
 [yukibot]:      https://github.com/barrucadu/yukibot
