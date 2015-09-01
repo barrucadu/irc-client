@@ -68,8 +68,7 @@ runner = do
   let initialise = flip runReaderT state $ do
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
         send $ Nick theNick
-        mapM_ (send . Join) . _channels <$> instanceConfig
-        return ()
+        instanceConfig >>= mapM_ (send . Join) . _channels
 
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
