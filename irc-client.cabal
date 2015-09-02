@@ -77,7 +77,6 @@ library
   
   -- Compile with -Wall by default
   ghc-options:         -Wall
-                       -fno-warn-unused-do-bind
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
