@@ -83,8 +83,8 @@ runner = do
 
   dchandler <- _disconnect <$> connectionConfig
 
-  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit (logf FromServer . toByteString)
-  let sink   = forgetful =$= logConduit (logf FromClient . _raw) =$ eventSink state
+  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit (logf FromClient . toByteString)
+  let sink   = forgetful =$= logConduit (logf FromServer . _raw) =$ eventSink state
 
   liftIO $ func port server initialise sink source
 
@@ -150,7 +150,7 @@ fileLogger fp origin x = do
 
   appendFile fp $ unwords
     [ formatTime defaultTimeLocale "%c" now
-    , if origin == FromServer then "<---" else "--->"
+    , if origin == FromServer then "--->" else "<---"
     , init . tail $ show x
     ]
 
