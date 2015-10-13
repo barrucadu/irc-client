@@ -6,7 +6,7 @@
 -- > run host port nick = do
 -- >   conn <- connect host port 1
 -- >   let cfg = defaultIRCConf nick
--- >   let cfg' = cfg { _handlers = yourCustomEventHandlers : _handlers cfg }
+-- >   let cfg' = cfg { _eventHandlers = yourCustomEventHandlers : _eventHandlers cfg }
 -- >   start conn cfg'
 --
 -- You shouldn't really need to tweak anything other than the event
