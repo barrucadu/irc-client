@@ -31,64 +31,87 @@ type UnicodeMessage = Message Text
 -- *State
 
 -- | The IRC monad.
-type IRC a = ReaderT IRCState IO a
+type IRC a = StatefulIRC () a
 
-data IRCState = IRCState { _connectionConfig :: ConnectionConfig
-                         -- ^Read-only connection configuration
-                         , _instanceConfig   :: TVar InstanceConfig
-                         -- ^Mutable instance configuration in STM
-                         }
+-- | The IRC monad, with state.
+type StatefulIRC s a = ReaderT (IRCState s) IO a
+
+data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
+                           -- ^Read-only connection configuration
+                           , _userState :: TVar s
+                           -- ^Mutable user state
+                           , _instanceConfig   :: TVar (InstanceConfig s)
+                           -- ^Mutable instance configuration in STM
+                           }
 
 -- | Construct a new IRC state
-newIRCState :: MonadIO m => ConnectionConfig -> InstanceConfig -> m IRCState
-newIRCState cconf iconf = do
-  tvar <- liftIO . atomically . newTVar $ iconf
+newIRCState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IRCState s)
+newIRCState cconf iconf ustate = do
+  ustvar <- liftIO . atomically . newTVar $ ustate
+  ictvar <- liftIO . atomically . newTVar $ iconf
 
   return IRCState
     { _connectionConfig = cconf
-    , _instanceConfig   = tvar
+    , _userState        = ustvar
+    , _instanceConfig   = ictvar
     }
 
--- | Access the entire state.
-ircState :: IRC IRCState
+-- | Access the client state.
+ircState :: StatefulIRC s (IRCState s)
 ircState = ask
 
 -- | Extract the connection configuration from an IRC state
-getConnectionConfig :: IRCState -> ConnectionConfig
+getConnectionConfig :: IRCState s -> ConnectionConfig s
 getConnectionConfig = _connectionConfig
 
 -- | Extract the instance configuration from an IRC state
-getInstanceConfig :: IRCState -> TVar InstanceConfig
+getInstanceConfig :: IRCState s -> TVar (InstanceConfig s)
 getInstanceConfig = _instanceConfig
+
+-- | Extract the user state from an IRC state
+getUserState :: IRCState s -> TVar s
+getUserState = _userState
 
 -- | Extract the current snapshot of the instance configuration from
 -- an IRC state
-getInstanceConfig' :: MonadIO m => IRCState -> m InstanceConfig
+getInstanceConfig' :: MonadIO m => IRCState s -> m (InstanceConfig s)
 getInstanceConfig' = liftIO . atomically . readTVar . _instanceConfig
 
 -- | Access the connection config
-connectionConfig :: IRC ConnectionConfig
+connectionConfig :: StatefulIRC s (ConnectionConfig s)
 connectionConfig = _connectionConfig <$> ask
 
 -- | Access the instance config TVar
-instanceConfigTVar :: IRC (TVar InstanceConfig)
+instanceConfigTVar :: StatefulIRC s (TVar (InstanceConfig s))
 instanceConfigTVar = _instanceConfig <$> ask
 
 -- | Access the instance config as it is right now.
-instanceConfig :: IRC InstanceConfig
+instanceConfig :: StatefulIRC s (InstanceConfig s)
 instanceConfig = instanceConfigTVar >>= liftIO . atomically . readTVar
 
 -- | Overwrite the instance config, even if it has changed since we
 -- looked at it.
-putInstanceConfig :: InstanceConfig -> IRC ()
+putInstanceConfig :: InstanceConfig s -> StatefulIRC s ()
 putInstanceConfig iconf = instanceConfigTVar >>= liftIO . atomically . flip writeTVar iconf
+
+-- | Access the user state.
+stateTVar :: StatefulIRC s (TVar s)
+stateTVar = _userState <$> ask
+
+-- | Access the user state as it is right now.
+state :: StatefulIRC s s
+state = stateTVar >>= liftIO . atomically . readTVar
+
+-- | Set the user state.
+putState :: s -> StatefulIRC s ()
+putState s = stateTVar >>= liftIO . atomically . flip writeTVar s
 
 -- | The origin of a message.
 data Origin = FromServer | FromClient
   deriving (Eq, Read, Show)
 
 -- | The static state of an IRC server connection.
-data ConnectionConfig = ConnectionConfig
+data ConnectionConfig s = ConnectionConfig
   { _func       :: Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
   -- ^ Function to connect and start the conduits.
   , _sendqueue  :: TBMChan IrcMessage
@@ -99,14 +122,14 @@ data ConnectionConfig = ConnectionConfig
   -- ^ The server port.
   , _flood      :: NominalDiffTime
   -- ^ The minimum time between two adjacent messages.
-  , _disconnect :: IRC ()
+  , _disconnect :: StatefulIRC s ()
   -- ^ Action to run if the remote server closes the connection.
   , _logfunc    :: Origin -> ByteString -> IO ()
   -- ^ Function to log messages sent to and received from the server.
   }
 
 -- | The updateable state of an IRC connection.
-data InstanceConfig = InstanceConfig
+data InstanceConfig s = InstanceConfig
   { _nick     :: Text
   -- ^ Client nick
   , _username :: Text
@@ -117,7 +140,7 @@ data InstanceConfig = InstanceConfig
   -- ^ Current channels
   , _ctcpVer  :: Text
   -- ^ Response to CTCP VERSION
-  , _eventHandlers :: [EventHandler]
+  , _eventHandlers :: [EventHandler s]
   -- ^ The registered event handlers
   , _ignore   :: [(Text, Maybe Text)]
   -- ^ List of nicks (optionally restricted to channels) to ignore
@@ -136,12 +159,12 @@ data EventType
   deriving (Eq, Show)
 
 -- | A function which handles an event.
-data EventHandler = EventHandler
+data EventHandler s = EventHandler
   { _description :: Text
   -- ^ A description of the event handler.
   , _matchType   :: EventType
   -- ^ Which type to be triggered by
-  , _eventFunc   :: UnicodeEvent -> IRC ()
+  , _eventFunc   :: UnicodeEvent -> StatefulIRC s ()
   -- ^ The function to call.
   }
 

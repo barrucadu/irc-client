@@ -33,12 +33,12 @@ import System.Locale    (defaultTimeLocale)
 -- | Connect to a server using the supplied connection function.
 connectInternal :: MonadIO m
   => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
-  -> IRC ()
+  -> StatefulIRC s ()
   -> (Origin -> ByteString -> IO ())
   -> ByteString
   -> Int
   -> NominalDiffTime
-  -> m ConnectionConfig
+  -> m (ConnectionConfig s)
 connectInternal f dcHandler logf host port flood = liftIO $ do
   queueS <- newTBMChanIO 16
 
@@ -55,7 +55,7 @@ connectInternal f dcHandler logf host port flood = liftIO $ do
 -- * Event loop
 
 -- | The event loop.
-runner :: IRC ()
+runner :: StatefulIRC s ()
 runner = do
   state <- ircState
 
@@ -99,7 +99,7 @@ forgetful = awaitForever go where
 
 -- | Block on receiving a message and invoke all matching handlers
 -- concurrently.
-eventSink :: MonadIO m => IRCState -> Consumer IrcEvent m ()
+eventSink :: MonadIO m => IRCState s -> Consumer IrcEvent m ()
 eventSink ircstate = awaitForever $ \event -> do
   let event'  = decodeUtf8 <$> event
   ignored <- isIgnored ircstate event'
@@ -108,7 +108,7 @@ eventSink ircstate = awaitForever $ \event -> do
     liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
 
 -- | Check if an event is ignored or not.
-isIgnored :: MonadIO m => IRCState -> UnicodeEvent -> m Bool
+isIgnored :: MonadIO m => IRCState s -> UnicodeEvent -> m Bool
 isIgnored ircstate ev = do
   iconf <- liftIO . atomically . readTVar . _instanceConfig $ ircstate
   let ignoreList = _ignore iconf
@@ -120,7 +120,7 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |Get the event handlers for an event.
-getHandlersFor :: Event a -> [EventHandler] -> [UnicodeEvent -> IRC ()]
+getHandlersFor :: Event a -> [EventHandler s] -> [UnicodeEvent -> StatefulIRC s ()]
 getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _matchType eh `elem` [EEverything, eventType e]]
 
 -- |A conduit which logs everything which goes through it.
@@ -162,12 +162,12 @@ noopLogger _ _ = return ()
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
-send :: UnicodeMessage -> IRC ()
+send :: UnicodeMessage -> StatefulIRC s ()
 send = sendBS . fmap encodeUtf8
 
 -- | Send a message, using TLS if enabled. This blocks if messages are
 -- sent too rapidly.
-sendBS :: IrcMessage -> IRC ()
+sendBS :: IrcMessage -> StatefulIRC s ()
 sendBS msg = do
   queue <- _sendqueue <$> connectionConfig
   liftIO . atomically $ writeTBMChan queue msg
@@ -176,7 +176,7 @@ sendBS msg = do
 
 -- | Disconnect from the server, properly tearing down the TLS session
 -- (if there is one).
-disconnect :: IRC ()
+disconnect :: StatefulIRC s ()
 disconnect = do
   queueS <- _sendqueue <$> connectionConfig
 
@@ -189,7 +189,7 @@ disconnect = do
   disconnectNow
 
 -- | Disconnect immediately, without waiting for messages to be sent.
-disconnectNow :: IRC ()
+disconnectNow :: StatefulIRC s ()
 disconnectNow = do
   queueS <- _sendqueue <$> connectionConfig
   liftIO . atomically $ closeTBMChan queueS

@@ -60,7 +60,7 @@ import qualified Data.Text as T
 --
 -- If you are building a bot, you may want to write an event handler
 -- to process messages representing commands.
-defaultEventHandlers :: [EventHandler]
+defaultEventHandlers :: [EventHandler s]
 defaultEventHandlers =
   [ EventHandler "Respond to server PING requests"  EPing    pingHandler
   , EventHandler "Respond to CTCP PING requests"    ECTCP    ctcpPingHandler
@@ -73,24 +73,24 @@ defaultEventHandlers =
   ]
 
 -- | Respond to server @PING@ messages with a @PONG@.
-pingHandler :: UnicodeEvent -> IRC ()
+pingHandler :: UnicodeEvent -> StatefulIRC s ()
 pingHandler ev = case _message ev of
   Ping s1 s2 -> send . Pong $ fromMaybe s1 s2
   _ -> return ()
 
 -- | Respond to CTCP @PING@ requests with a CTCP @PONG@.
-ctcpPingHandler :: UnicodeEvent -> IRC ()
+ctcpPingHandler :: UnicodeEvent -> StatefulIRC s ()
 ctcpPingHandler = ctcpHandler [("PING", return)]
 
 -- | Respond to CTCP @VERSION@ requests with the version string.
-ctcpVersionHandler :: UnicodeEvent -> IRC ()
+ctcpVersionHandler :: UnicodeEvent -> StatefulIRC s ()
 ctcpVersionHandler = ctcpHandler [("VERSION", go)] where
   go _ = do
     ver <- _ctcpVer <$> instanceConfig
     return [ver]
 
 -- | Respond to CTCP @TIME@ requests with the system time.
-ctcpTimeHandler :: UnicodeEvent -> IRC ()
+ctcpTimeHandler :: UnicodeEvent -> StatefulIRC s ()
 ctcpTimeHandler = ctcpHandler [("TIME", go)] where
   go _ = do
     now <- liftIO getCurrentTime
@@ -98,7 +98,7 @@ ctcpTimeHandler = ctcpHandler [("TIME", go)] where
 
 -- | Update the nick upon welcome (numeric reply 001), as it may not
 -- be what we requested (eg, in the case of a nick too long).
-welcomeNick :: UnicodeEvent -> IRC ()
+welcomeNick :: UnicodeEvent -> StatefulIRC s ()
 welcomeNick = numHandler [(001, go)] where
   go (srvNick:_) = do
     tvarI <- instanceConfigTVar
@@ -110,7 +110,7 @@ welcomeNick = numHandler [(001, go)] where
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
-nickMangler :: UnicodeEvent -> IRC ()
+nickMangler :: UnicodeEvent -> StatefulIRC s ()
 nickMangler = numHandler [ (432, go fresh)
                          , (433, go mangle)
                          , (436, go mangle)
@@ -165,7 +165,7 @@ nickMangler = numHandler [ (432, go fresh)
 
 -- | Upon receiving a channel topic (numeric reply 332), add the
 -- channel to the list (if not already present).
-joinHandler :: UnicodeEvent -> IRC ()
+joinHandler :: UnicodeEvent -> StatefulIRC s ()
 joinHandler = numHandler [(332, go)] where
   go (c:_) = do
     tvarI <- instanceConfigTVar
@@ -178,7 +178,7 @@ joinHandler = numHandler [(332, go)] where
   go _ = return ()
 
 -- | Update the channel list upon being kicked.
-kickHandler :: UnicodeEvent -> IRC ()
+kickHandler :: UnicodeEvent -> StatefulIRC s ()
 kickHandler ev = do
   theNick <- _nick <$> instanceConfig
   tvarI   <- instanceConfigTVar
@@ -192,13 +192,13 @@ kickHandler ev = do
 
 -- | The default disconnect handler: do nothing. You might want to
 -- override this with one which reconnects.
-defaultDisconnectHandler :: IRC ()
+defaultDisconnectHandler :: StatefulIRC s ()
 defaultDisconnectHandler = return ()
 
 -- *Utils
 
 -- | Match and handle a named CTCP
-ctcpHandler :: [(Text, [Text] -> IRC [Text])] -> UnicodeEvent -> IRC ()
+ctcpHandler :: [(Text, [Text] -> StatefulIRC s [Text])] -> UnicodeEvent -> StatefulIRC s ()
 ctcpHandler hs ev = case (_source ev, _message ev) of
   (User n, Privmsg _ (Left ctcpbs)) ->
     let (verb, xs) = first toUpper $ fromCTCP ctcpbs
@@ -210,7 +210,7 @@ ctcpHandler hs ev = case (_source ev, _message ev) of
   _ -> return ()
 
 -- | Match and handle a numeric reply
-numHandler :: [(Int, [Text] -> IRC ())] -> UnicodeEvent -> IRC ()
+numHandler :: [(Int, [Text] -> StatefulIRC s ())] -> UnicodeEvent -> StatefulIRC s ()
 numHandler hs ev = case _message ev of
   Numeric num xs -> maybe (return ()) ($xs) $ lookup num hs
   _ -> return ()

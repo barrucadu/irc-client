@@ -18,6 +18,7 @@ module Network.IRC.Client
   , connectWithTLS
   , start
   , start'
+  , startStateful
 
   -- * Logging
   , Origin (..)
@@ -67,7 +68,7 @@ connect :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m ConnectionConfig
+  -> m (ConnectionConfig s)
 connect = connect' noopLogger
 
 -- | Connect to a server with TLS.
@@ -78,7 +79,7 @@ connectWithTLS :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m ConnectionConfig
+  -> m (ConnectionConfig s)
 connectWithTLS = connectWithTLS' noopLogger
 
 -- | Connect to a server without TLS, with the provided logging
@@ -92,7 +93,7 @@ connect' :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m ConnectionConfig
+  -> m (ConnectionConfig s)
 connect' = connectInternal ircClient defaultDisconnectHandler
 
 -- | Connect to a server with TLS, with the provided logging function.
@@ -105,7 +106,7 @@ connectWithTLS' :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m ConnectionConfig
+  -> m (ConnectionConfig s)
 connectWithTLS' = connectInternal ircTLSClient defaultDisconnectHandler
 
 -- * Starting
@@ -113,23 +114,27 @@ connectWithTLS' = connectInternal ircTLSClient defaultDisconnectHandler
 -- | Run the event loop for a server, receiving messages and handing
 -- them off to handlers as appropriate. Messages will be logged to
 -- stdout.
-start :: MonadIO m => ConnectionConfig -> InstanceConfig -> m ()
-start cconf iconf = newIRCState cconf iconf >>= start'
+start :: MonadIO m => ConnectionConfig () -> InstanceConfig () -> m ()
+start cconf iconf = startStateful cconf iconf ()
+
+-- | like 'start' but for clients with state.
+startStateful :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m ()
+startStateful cconf iconf ustate = newIRCState cconf iconf ustate >>= start'
 
 -- | Like 'start', but use the provided initial state.
-start' :: MonadIO m => IRCState -> m ()
+start' :: MonadIO m => IRCState s -> m ()
 start' = liftIO . runReaderT runner
 
 -- * Default configuration
 
 -- | Construct a default IRC configuration from a nick
-defaultIRCConf :: Text -> InstanceConfig
+defaultIRCConf :: Text -> InstanceConfig s
 defaultIRCConf n = InstanceConfig
   { _nick          = n
   , _username      = n
   , _realname      = n
   , _channels      = []
-  , _ctcpVer       = "irc-client-0.2.3.0"
+  , _ctcpVer       = "irc-client-0.2.5.0"
   , _eventHandlers = defaultEventHandlers
   , _ignore        = []
   }

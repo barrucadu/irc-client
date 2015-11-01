@@ -13,7 +13,7 @@ import qualified Data.Text as T
 -- | Update the nick in the instance configuration and also send an
 -- update message to the server. This doesn't attempt to resolve nick
 -- collisions, that's up to the event handlers.
-setNick :: Text -> IRC ()
+setNick :: Text -> StatefulIRC s ()
 setNick new = do
   tvarI <- instanceConfigTVar
 
@@ -25,7 +25,7 @@ setNick new = do
 
 -- | Update the channel list in the instance configuration and also
 -- part the channel.
-leaveChannel :: Text -> Maybe Text -> IRC ()
+leaveChannel :: Text -> Maybe Text -> StatefulIRC s ()
 leaveChannel chan reason = do
   tvarI <- instanceConfigTVar
   liftIO . atomically $ delChan tvarI chan
@@ -35,13 +35,13 @@ leaveChannel chan reason = do
 -- | Remove a channel from the list without sending a part command (be
 -- careful not to let the channel list get out of sync with the
 -- real-world state if you use it for anything!)
-delChan :: TVar InstanceConfig -> Text -> STM ()
+delChan :: TVar (InstanceConfig s) -> Text -> STM ()
 delChan tvarI chan = do
   iconf <- readTVar tvarI
   writeTVar tvarI iconf { _channels = filter (/=chan) $ _channels iconf }
 
 -- | Send a message to the source of an event.
-reply :: UnicodeEvent -> Text -> IRC ()
+reply :: UnicodeEvent -> Text -> StatefulIRC s ()
 reply ev txt = case _source ev of
   Channel c _ -> mapM_ (send . Privmsg c . Right) $ T.lines txt
   User n      -> mapM_ (send . Privmsg n . Right) $ T.lines txt
