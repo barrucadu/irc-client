@@ -103,9 +103,9 @@ library
   
 source-repository head
   type:     git
-  location: https://github.com/barrucadu/irc-conduit.git
+  location: https://github.com/barrucadu/irc-client.git
 
 source-repository this
   type:     git
-  location: https://github.com/barrucadu/irc-conduit.git
+  location: https://github.com/barrucadu/irc-client.git
   tag:      0.2.4.0

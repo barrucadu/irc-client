@@ -40,6 +40,16 @@ delChan tvarI chan = do
   iconf <- readTVar tvarI
   writeTVar tvarI iconf { _channels = filter (/=chan) $ _channels iconf }
 
+-- | Add an eventHandler
+addHandler :: EventHandler () -> StatefulIRC () ()
+addHandler handler = do
+  tvarI <- instanceConfigTVar
+
+  liftIO . atomically $  do
+    iconf <- readTVar tvarI
+    writeTVar tvarI iconf { _eventHandlers = handler : _eventHandlers iconf }
+
+
 -- | Send a message to the source of an event.
 reply :: UnicodeEvent -> Text -> StatefulIRC s ()
 reply ev txt = case _source ev of
