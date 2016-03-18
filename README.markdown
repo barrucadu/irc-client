@@ -38,6 +38,6 @@ or email (mike@barrucadu.co.uk).
 [irc-client]:   https://hackage.haskell.org/package/irc-client
 [build-status]: http://ci.barrucadu.co.uk/job/(irc-client)/job/irc-client/badge/icon?style=plastic
 [build-log]:    http://ci.barrucadu.co.uk/job/(irc-client)/job/irc-client/
-[docs]:         https://barrucadu.github.io/irc-client/
+[docs]:         https://docs.barrucadu.co.uk/irc-client
 [irc-conduit]:  https://hackage.haskell.org/package/irc-conduit
 [yukibot]:      https://github.com/barrucadu/yukibot
