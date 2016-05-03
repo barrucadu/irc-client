@@ -135,7 +135,7 @@ defaultIRCConf n = InstanceConfig
   , _username      = n
   , _realname      = n
   , _channels      = []
-  , _ctcpVer       = "irc-client-0.2.5.0"
+  , _ctcpVer       = "irc-client-0.3.0.0"
   , _eventHandlers = defaultEventHandlers
   , _ignore        = []
   }
