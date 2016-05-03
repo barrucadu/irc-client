@@ -35,7 +35,8 @@ module Network.IRC.Client
 
   -- * Defaults
   , defaultIRCConf
-  , defaultDisconnectHandler
+  , defaultOnConnect
+  , defaultOnDisconnect
   , defaultEventHandlers
 
   -- * Types
@@ -94,7 +95,7 @@ connect' :: MonadIO m
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> m (ConnectionConfig s)
-connect' = connectInternal ircClient defaultDisconnectHandler
+connect' = connectInternal ircClient defaultOnConnect defaultOnDisconnect
 
 -- | Connect to a server with TLS, with the provided logging function.
 connectWithTLS' :: MonadIO m
@@ -107,7 +108,7 @@ connectWithTLS' :: MonadIO m
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> m (ConnectionConfig s)
-connectWithTLS' = connectInternal ircTLSClient defaultDisconnectHandler
+connectWithTLS' = connectInternal ircTLSClient defaultOnConnect defaultOnDisconnect
 
 -- * Starting
 

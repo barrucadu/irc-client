@@ -122,7 +122,10 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ The server port.
   , _flood      :: NominalDiffTime
   -- ^ The minimum time between two adjacent messages.
-  , _disconnect :: StatefulIRC s ()
+  , _onconnect :: StatefulIRC s ()
+  -- ^ Action to run after successfully connecting to the server and
+  -- setting the nick.
+  , _ondisconnect :: StatefulIRC s ()
   -- ^ Action to run if the remote server closes the connection.
   , _logfunc    :: Origin -> ByteString -> IO ()
   -- ^ Function to log messages sent to and received from the server.

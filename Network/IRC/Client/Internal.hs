@@ -33,23 +33,32 @@ import System.Locale    (defaultTimeLocale)
 -- | Connect to a server using the supplied connection function.
 connectInternal :: MonadIO m
   => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
+  -- ^ Function to start the network conduits.
   -> StatefulIRC s ()
+  -- ^ Connect handler
+  -> StatefulIRC s ()
+  -- ^ Disconnect handler
   -> (Origin -> ByteString -> IO ())
+  -- ^ Logging function
   -> ByteString
+  -- ^ Server hostname
   -> Int
+  -- ^ Server post
   -> NominalDiffTime
+  -- ^ Flood timeout
   -> m (ConnectionConfig s)
-connectInternal f dcHandler logf host port flood = liftIO $ do
+connectInternal f onconnect ondisconnect logf host port flood = liftIO $ do
   queueS <- newTBMChanIO 16
 
   return ConnectionConfig
-    { _func       = f
-    , _sendqueue  = queueS
-    , _server     = host
-    , _port       = port
-    , _flood      = flood
-    , _disconnect = dcHandler
-    , _logfunc    = logf
+    { _func         = f
+    , _sendqueue    = queueS
+    , _server       = host
+    , _port         = port
+    , _flood        = flood
+    , _onconnect    = onconnect
+    , _ondisconnect = ondisconnect
+    , _logfunc      = logf
     }
 
 -- * Event loop
@@ -59,16 +68,14 @@ runner :: StatefulIRC s ()
 runner = do
   state <- ircState
 
-  -- Set the nick and username
-  theNick <- _nick     <$> instanceConfig
+  -- Set the real- and user-name
   theUser <- _username <$> instanceConfig
   theReal <- _realname <$> instanceConfig
 
   -- Initialise the IRC session
   let initialise = flip runReaderT state $ do
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
-        send $ Nick theNick
-        instanceConfig >>= mapM_ (send . Join) . _channels
+        _onconnect =<< connectionConfig
 
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
@@ -81,7 +88,7 @@ runner = do
 
   antiflood <- liftIO $ floodProtector flood
 
-  dchandler <- _disconnect <$> connectionConfig
+  dchandler <- _ondisconnect <$> connectionConfig
 
   let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit (logf FromClient . toByteString)
   let sink   = forgetful =$= logConduit (logf FromServer . _raw) =$ eventSink state

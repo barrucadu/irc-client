@@ -13,8 +13,9 @@ module Network.IRC.Client.Handlers
   , welcomeNick
   , nickMangler
 
-  -- * Disconnect handlers
-  , defaultDisconnectHandler
+  -- * Special handlers
+  , defaultOnConnect
+  , defaultOnDisconnect
   ) where
 
 import Control.Applicative    ((<$>))
@@ -188,12 +189,20 @@ kickHandler ev = do
                               | otherwise   -> return ()
     _ -> return ()
 
--- *Misc
+-- *Special
+
+-- | The default connect handler: set the nick and join default
+-- channels.
+defaultOnConnect :: StatefulIRC s ()
+defaultOnConnect = do
+  iconf <- instanceConfig
+  send . Nick $ _nick iconf
+  mapM_ (send . Join) $ _channels iconf
 
 -- | The default disconnect handler: do nothing. You might want to
 -- override this with one which reconnects.
-defaultDisconnectHandler :: StatefulIRC s ()
-defaultDisconnectHandler = return ()
+defaultOnDisconnect :: StatefulIRC s ()
+defaultOnDisconnect = return ()
 
 -- *Utils
 
