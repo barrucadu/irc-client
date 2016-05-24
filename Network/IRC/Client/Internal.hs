@@ -71,11 +71,13 @@ runner = do
   state <- ircState
 
   -- Set the real- and user-name
-  theUser <- _username <$> instanceConfig
-  theReal <- _realname <$> instanceConfig
+  theUser  <- _username <$> instanceConfig
+  theReal  <- _realname <$> instanceConfig
+  password <- _password <$> instanceConfig
 
   -- Initialise the IRC session
   let initialise = flip runReaderT state $ do
+        mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) password
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
         _onconnect =<< connectionConfig
 
