@@ -81,12 +81,13 @@ runner = do
 
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
-  flood  <- _flood     <$> connectionConfig
-  func   <- _func      <$> connectionConfig
-  logf   <- _logfunc   <$> connectionConfig
-  port   <- _port      <$> connectionConfig
-  queue  <- _sendqueue <$> connectionConfig
-  server <- _server    <$> connectionConfig
+  cconf <- connectionConfig
+  let flood  = _flood     cconf
+  let func   = _func      cconf
+  let logf   = _logfunc   cconf
+  let port   = _port      cconf
+  let queue  = _sendqueue cconf
+  let server = _server    cconf
 
   antiflood <- liftIO $ floodProtector flood
 
