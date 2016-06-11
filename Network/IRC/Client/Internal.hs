@@ -1,6 +1,7 @@
-{-# LANGUAGE CPP                #-}
-{-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE CPP                 #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Most of the hairy code. This isn't all internal, due to messy
 -- dependencies, but I've tried to make this as \"internal\" as
@@ -10,6 +11,7 @@ module Network.IRC.Client.Internal where
 import Control.Applicative        ((<$>))
 import Control.Concurrent         (forkIO)
 import Control.Concurrent.STM     (atomically, readTVar, retry)
+import Control.Exception          (SomeException, catch, throwIO)
 import Control.Monad              (unless)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
@@ -93,10 +95,15 @@ runner = do
   let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit (logf FromClient . toByteString)
   let sink   = forgetful =$= logConduit (logf FromServer . _raw) =$ eventSink state
 
-  liftIO $ func port server initialise sink source
+  (exc :: Maybe SomeException) <- liftIO $ catch
+    (func port server initialise sink source >> pure Nothing)
+    (pure . Just)
 
   disconnect
   dchandler
+
+  -- If the connection terminated due to an exception, rethrow it.
+  liftIO $ maybe (pure ()) throwIO exc
 
 -- | Forget failed decodings.
 forgetful :: Monad m => Conduit (Either a b) m b
