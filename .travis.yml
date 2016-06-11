@@ -21,8 +21,6 @@ matrix:
     addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
   - env: RESOLVER="nightly"
     addons: {apt: {packages: [libgmp-dev]}}
-  allow_failures:
-  - env: RESOLVER="nightly"
 
 # Download and unpack the stack executable
 before_install:
