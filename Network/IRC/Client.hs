@@ -134,6 +134,7 @@ defaultIRCConf n = InstanceConfig
   { _nick          = n
   , _username      = n
   , _realname      = n
+  , _password      = Nothing
   , _channels      = []
   , _ctcpVer       = "irc-client-0.3.0.0"
   , _eventHandlers = defaultEventHandlers

@@ -139,6 +139,8 @@ data InstanceConfig s = InstanceConfig
   -- ^ Client username
   , _realname :: Text
   -- ^ Client realname
+  , _password :: Maybe Text
+  -- ^ Client password
   , _channels :: [Text]
   -- ^ Current channels
   , _ctcpVer  :: Text
