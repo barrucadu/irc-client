@@ -11,6 +11,7 @@ module Network.IRC.Client.Handlers
   , ctcpVersionHandler
   , ctcpTimeHandler
   , welcomeNick
+  , joinOnWelcome
   , nickMangler
 
   -- * Special handlers
@@ -68,6 +69,7 @@ defaultEventHandlers =
   , EventHandler "Respond to CTCP VERSION requests" ECTCP    ctcpVersionHandler
   , EventHandler "Respond to CTCP TIME requests"    ECTCP    ctcpTimeHandler
   , EventHandler "Update the nick upon welcome"     ENumeric welcomeNick
+  , EventHandler "Join channels upon welcome"       ENumeric joinOnWelcome
   , EventHandler "Mangle the nick on collision"     ENumeric nickMangler
   , EventHandler "Update the channel list on JOIN"  ENumeric joinHandler
   , EventHandler "Update the channel lift on KICK"  EKick    kickHandler
@@ -108,6 +110,14 @@ welcomeNick = numHandler [(001, go)] where
       iconf <- readTVar tvarI
       writeTVar tvarI iconf { _nick = srvNick }
   go _ = return ()
+
+-- | Join default channels upon welcome (numeric reply 001). If sent earlier,
+-- the server might reject the JOIN attempts.
+joinOnWelcome :: UnicodeEvent -> StatefulIRC s ()
+joinOnWelcome = numHandler [(001, go)] where
+  go _ = do
+    iconf <- instanceConfig
+    mapM_ (send . Join) $ _channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
@@ -191,13 +201,11 @@ kickHandler ev = do
 
 -- *Special
 
--- | The default connect handler: set the nick and join default
--- channels.
+-- | The default connect handler: set the nick.
 defaultOnConnect :: StatefulIRC s ()
 defaultOnConnect = do
   iconf <- instanceConfig
   send . Nick $ _nick iconf
-  mapM_ (send . Join) $ _channels iconf
 
 -- | The default disconnect handler: do nothing. You might want to
 -- override this with one which reconnects.
