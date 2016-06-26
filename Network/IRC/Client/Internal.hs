@@ -16,7 +16,7 @@ import Control.Monad              (unless)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
-import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), awaitForever, toProducer, yield)
+import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
 import Data.Time.Clock            (NominalDiffTime, getCurrentTime)
@@ -118,12 +118,16 @@ forgetful = awaitForever go where
 -- | Block on receiving a message and invoke all matching handlers
 -- concurrently.
 eventSink :: MonadIO m => IRCState s -> Consumer IrcEvent m ()
-eventSink ircstate = awaitForever $ \event -> do
+eventSink ircstate = await >>= maybe (return ()) (\event -> do
   let event'  = decodeUtf8 <$> event
   ignored <- isIgnored ircstate event'
   unless ignored $ do
     handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
     liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
+
+  -- If disconnected, do not loop.
+  disconnected <- (==Disconnected) <$> getConnState ircstate
+  unless disconnected (eventSink ircstate))
 
 -- | Check if an event is ignored or not.
 isIgnored :: MonadIO m => IRCState s -> UnicodeEvent -> m Bool
