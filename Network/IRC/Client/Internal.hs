@@ -10,7 +10,7 @@ module Network.IRC.Client.Internal where
 
 import Control.Applicative        ((<$>))
 import Control.Concurrent         (forkIO)
-import Control.Concurrent.STM     (atomically, readTVar, retry)
+import Control.Concurrent.STM     (atomically, readTVar, retry, writeTVar)
 import Control.Exception          (SomeException, catch, throwIO)
 import Control.Monad              (unless)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
@@ -77,6 +77,7 @@ runner = do
 
   -- Initialise the IRC session
   let initialise = flip runReaderT state $ do
+        liftIO . atomically $ writeTVar (_connState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) password
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
         _onconnect =<< connectionConfig
@@ -195,18 +196,31 @@ sendBS msg = do
 -- (if there is one).
 disconnect :: StatefulIRC s ()
 disconnect = do
-  queueS <- _sendqueue <$> connectionConfig
+  s <- ircState
 
-  -- Wait for all messages to be sent
-  liftIO . atomically $ do
-    empty <- isEmptyTBMChan queueS
-    unless empty retry
+  connState <- liftIO . atomically . readTVar $ _connState s
+  case connState of
+    Connected -> do
+      -- Set the state to @Disconnecting@
+      liftIO . atomically $ writeTVar (_connState s) Disconnecting
 
-  -- Then close the connection
-  disconnectNow
+      -- Wait for all messages to be sent
+      queueS <- _sendqueue <$> connectionConfig
+      liftIO . atomically $ do
+        empty <- isEmptyTBMChan queueS
+        unless empty retry
+
+      -- Then close the connection
+      disconnectNow
+
+    -- If already disconnected, or disconnecting, do nothing.
+    _ -> pure ()
 
 -- | Disconnect immediately, without waiting for messages to be sent.
 disconnectNow :: StatefulIRC s ()
 disconnectNow = do
   queueS <- _sendqueue <$> connectionConfig
   liftIO . atomically $ closeTBMChan queueS
+
+  s <- ircState
+  liftIO . atomically $ writeTVar (_connState s) Disconnected

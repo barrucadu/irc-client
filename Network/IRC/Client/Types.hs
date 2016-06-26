@@ -42,18 +42,26 @@ data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
                            -- ^Mutable user state
                            , _instanceConfig   :: TVar (InstanceConfig s)
                            -- ^Mutable instance configuration in STM
+                           , _connState :: TVar ConnectionState
+                           -- ^State of the connection.
                            }
+
+-- | The state of the connection.
+data ConnectionState = Connected | Disconnecting | Disconnected
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 -- | Construct a new IRC state
 newIRCState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IRCState s)
 newIRCState cconf iconf ustate = do
   ustvar <- liftIO . atomically . newTVar $ ustate
   ictvar <- liftIO . atomically . newTVar $ iconf
+  cstvar <- liftIO . atomically . newTVar $ Disconnected
 
   return IRCState
     { _connectionConfig = cconf
     , _userState        = ustvar
     , _instanceConfig   = ictvar
+    , _connState        = cstvar
     }
 
 -- | Access the client state.
@@ -71,6 +79,10 @@ getInstanceConfig = _instanceConfig
 -- | Extract the user state from an IRC state
 getUserState :: IRCState s -> TVar s
 getUserState = _userState
+
+-- | Extract the connection state from an IRC state.
+getConnState :: MonadIO m => IRCState s -> m ConnectionState
+getConnState = liftIO . atomically . readTVar . _connState
 
 -- | Extract the current snapshot of the instance configuration from
 -- an IRC state
