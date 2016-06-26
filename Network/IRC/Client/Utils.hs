@@ -64,3 +64,15 @@ ctcp t command args = Privmsg t . Left $ toCTCP command args
 -- | Construct a @NOTICE@ containing a CTCP
 ctcpReply :: Text -> Text -> [Text] -> UnicodeMessage
 ctcpReply t command args = Notice t . Left $ toCTCP command args
+
+-- | Check if the client is connected.
+isConnected :: StatefulIRC s Bool
+isConnected = (==Connected) <$> (getConnState =<< ircState)
+
+-- | Check if the client is in the process of disconnecting.
+isDisconnecting :: StatefulIRC s Bool
+isDisconnecting = (==Disconnecting) <$> (getConnState =<< ircState)
+
+-- | Check if the client is disconnected
+isDisconnected :: StatefulIRC s Bool
+isDisconnected = (==Disconnected) <$> (getConnState =<< ircState)
