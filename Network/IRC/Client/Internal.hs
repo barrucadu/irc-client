@@ -12,14 +12,14 @@ import Control.Applicative        ((<$>))
 import Control.Concurrent         (forkIO)
 import Control.Concurrent.STM     (atomically, readTVar, retry, writeTVar)
 import Control.Exception          (SomeException, catch, throwIO)
-import Control.Monad              (unless)
+import Control.Monad              (unless, when)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
-import Data.Time.Clock            (NominalDiffTime, getCurrentTime)
+import Data.Time.Clock            (NominalDiffTime, addUTCTime, getCurrentTime)
 import Data.Time.Format           (formatTime)
 import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
 import Network.IRC.Client.Types
@@ -208,11 +208,9 @@ disconnect = do
       -- Set the state to @Disconnecting@
       liftIO . atomically $ writeTVar (_connState s) Disconnecting
 
-      -- Wait for all messages to be sent
+      -- Wait for all messages to be sent, or a minute has passed.
       queueS <- _sendqueue <$> connectionConfig
-      liftIO . atomically $ do
-        empty <- isEmptyTBMChan queueS
-        unless empty retry
+      timeout 60 . atomically $ isEmptyTBMChan queueS
 
       -- Then close the connection
       disconnectNow
@@ -228,3 +226,13 @@ disconnectNow = do
 
   s <- ircState
   liftIO . atomically $ writeTVar (_connState s) Disconnected
+
+-- | Block until an action is successful or a timeout is reached.
+timeout :: MonadIO m => NominalDiffTime -> IO Bool -> m ()
+timeout dt check = liftIO $ do
+  finish <- addUTCTime dt <$> getCurrentTime
+  let wait = do
+        now  <- getCurrentTime
+        cond <- check
+        when (now < finish && not cond) wait
+  wait
