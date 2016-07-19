@@ -174,6 +174,7 @@ fileLogger fp origin x = do
     [ formatTime defaultTimeLocale "%c" now
     , if origin == FromServer then "--->" else "<---"
     , init . tail $ show x
+    , "\n"
     ]
 
 -- | Do no logging.
