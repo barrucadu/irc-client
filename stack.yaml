@@ -1,7 +1,7 @@
 flags: {}
 packages:
 - '.'
-resolver: lts-5.8
+resolver: lts-7.0
 nix:
   enable: false
   packages: [zlib]
