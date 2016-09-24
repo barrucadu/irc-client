@@ -71,9 +71,10 @@ library
                      , Network.IRC.Client.Handlers
                      , Network.IRC.Client.Types
                      , Network.IRC.Client.Utils
+                     , Network.IRC.Client.Internal
   
   -- Modules included in this library but not exported.
-  other-modules:       Network.IRC.Client.Internal
+  -- other-modules:       
   
   -- Compile with -Wall by default
   ghc-options:         -Wall
