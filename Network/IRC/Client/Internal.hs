@@ -21,7 +21,7 @@ module Network.IRC.Client.Internal where
 
 import Control.Applicative        ((<$>))
 import Control.Concurrent         (forkIO)
-import Control.Concurrent.STM     (atomically, readTVar, retry, writeTVar)
+import Control.Concurrent.STM     (atomically, readTVar, writeTVar)
 import Control.Exception          (SomeException, catch, throwIO)
 import Control.Monad              (unless, when)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
@@ -45,7 +45,7 @@ import System.Locale    (defaultTimeLocale)
 
 -- | Connect to a server using the supplied connection function.
 connectInternal :: MonadIO m
-  => (Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
+  => (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
   -- ^ Function to start the network conduits.
   -> StatefulIRC s ()
   -- ^ Connect handler
@@ -56,7 +56,7 @@ connectInternal :: MonadIO m
   -> ByteString
   -- ^ Server hostname
   -> Int
-  -- ^ Server post
+  -- ^ Server port
   -> NominalDiffTime
   -- ^ Flood timeout
   -> m (ConnectionConfig s)
@@ -96,12 +96,10 @@ runner = do
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
   cconf <- connectionConfig
-  let flood  = _flood     cconf
-  let func   = _func      cconf
-  let logf   = _logfunc   cconf
-  let port   = _port      cconf
-  let queue  = _sendqueue cconf
-  let server = _server    cconf
+  let flood = _flood     cconf
+  let func  = _func      cconf
+  let logf  = _logfunc   cconf
+  let queue = _sendqueue cconf
 
   antiflood <- liftIO $ floodProtector flood
 
@@ -111,7 +109,7 @@ runner = do
   let sink   = forgetful =$= logConduit (logf FromServer . _raw) =$ eventSink state
 
   (exc :: Maybe SomeException) <- liftIO $ catch
-    (func port server initialise sink source >> pure Nothing)
+    (func initialise sink source >> pure Nothing)
     (pure . Just)
 
   disconnect

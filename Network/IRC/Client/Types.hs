@@ -132,7 +132,7 @@ data Origin = FromServer | FromClient
 
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
-  { _func       :: Int -> ByteString -> IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
+  { _func       :: IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
   -- ^ Function to connect and start the conduits.
   , _sendqueue  :: TBMChan IrcMessage
   -- ^ Message send queue.
