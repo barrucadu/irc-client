@@ -1,8 +1,16 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | The default event handlers. Handlers are invoked concurrently
--- when matching events are received from the server.
+-- |
+-- Module      : Network.IRC.Client.Handlers
+-- Copyright   : (c) 2016 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : CPP, OverloadedStrings
+--
+-- The default event handlers. Handlers are invoked concurrently when
+-- matching events are received from the server.
 module Network.IRC.Client.Handlers
   ( -- * Event handlers
     defaultEventHandlers

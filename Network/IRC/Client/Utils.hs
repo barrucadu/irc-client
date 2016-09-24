@@ -1,4 +1,12 @@
--- |Commonly-used utility functions for IRC clients.
+-- |
+-- Module      : Network.IRC.Client.Utils
+-- Copyright   : (c) 2016 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : portable
+--
+-- Commonly-used utility functions for IRC clients.
 module Network.IRC.Client.Utils where
 
 import Control.Concurrent.STM      (TVar, STM, atomically, readTVar, writeTVar)

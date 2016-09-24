@@ -1,6 +1,14 @@
 {-# LANGUAGE OverloadedStrings  #-}
 
--- | A simple IRC client library. Typical usage will be of this form:
+-- |
+-- Module      : Network.IRC.Client
+-- Copyright   : (c) 2016 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : OverloadedStrings
+--
+-- A simple IRC client library. Typical usage will be of this form:
 --
 -- > run :: ByteString -> Int -> Text -> IO ()
 -- > run host port nick = do

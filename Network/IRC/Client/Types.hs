@@ -1,6 +1,14 @@
 {-# LANGUAGE RankNTypes #-}
 
--- | Types for IRC clients. See also
+-- |
+-- Module      : Network.IRC.Client.Types
+-- Copyright   : (c) 2016 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : RankNTypes
+---
+-- Types for IRC clients. See also
 -- <http://hackage.haskell.org/package/irc-conduit/docs/Network-IRC-Conduit.html Network.IRC.Conduit> and
 -- <http://hackage.haskell.org/package/irc-ctcp-0.1.2.1/docs/Network-IRC-CTCP.html Network.IRC.CTCP>.
 module Network.IRC.Client.Types

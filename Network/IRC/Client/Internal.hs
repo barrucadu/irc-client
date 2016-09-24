@@ -3,9 +3,20 @@
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Most of the hairy code. This isn't all internal, due to messy
+-- |
+-- Module      : Network.IRC.Client.Internal
+-- Copyright   : (c) 2016 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : CPP, OverloadedStrings, RankNTypes, ScopedTypeVariables
+--
+-- Most of the hairy code. This isn't all internal, due to messy
 -- dependencies, but I've tried to make this as \"internal\" as
 -- reasonably possible.
+--
+-- This module is NOT considered to form part of the public interface
+-- of this library.
 module Network.IRC.Client.Internal where
 
 import Control.Applicative        ((<$>))
