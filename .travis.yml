@@ -14,13 +14,13 @@ cache:
 matrix:
   include:
   - env: RESOLVER="lts-4"
-    addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [libgmp-dev]}}
   - env: RESOLVER="lts-5"
-    addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [libgmp-dev]}}
   - env: RESOLVER="lts-6"
-    addons: {apt: {packages: [ghc-7.10.3], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [libgmp-dev]}}
   - env: RESOLVER="lts-7"
-    addons: {apt: {packages: [ghc-8.0.1], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [libgmp-dev]}}
   - env: RESOLVER="nightly"
     addons: {apt: {packages: [libgmp-dev]}}
 
@@ -32,4 +32,5 @@ before_install:
 
 # Test build
 script:
-- stack --no-terminal --install-ghc --resolver=$RESOLVER build
+- stack --no-terminal --resolver=$RESOLVER setup
+- stack --no-terminal --resolver=$RESOLVER build
