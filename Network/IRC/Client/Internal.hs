@@ -127,16 +127,17 @@ forgetful = awaitForever go where
 -- | Block on receiving a message and invoke all matching handlers
 -- concurrently.
 eventSink :: MonadIO m => IRCState s -> Consumer IrcEvent m ()
-eventSink ircstate = await >>= maybe (return ()) (\event -> do
-  let event'  = decodeUtf8 <$> event
-  ignored <- isIgnored ircstate event'
-  unless ignored $ do
-    handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
-    liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
+eventSink ircstate = go where
+  go = await >>= maybe (return ()) (\event -> do
+    let event'  = decodeUtf8 <$> event
+    ignored <- isIgnored ircstate event'
+    unless ignored $ do
+      handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
+      liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
 
-  -- If disconnected, do not loop.
-  disconnected <- (==Disconnected) <$> getConnState ircstate
-  unless disconnected (eventSink ircstate))
+    -- If disconnected, do not loop.
+    disconnected <- (==Disconnected) <$> getConnState ircstate
+    unless disconnected go)
 
 -- | Check if an event is ignored or not.
 isIgnored :: MonadIO m => IRCState s -> UnicodeEvent -> m Bool
