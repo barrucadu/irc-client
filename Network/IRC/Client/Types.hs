@@ -46,7 +46,8 @@ module Network.IRC.Client.Types
   , eventType
 
   -- ** Event Handlers
-  , EventHandler(..)
+  , EventHandler
+  , eventHandler
   , matchType
   , eventFunction
 
@@ -205,6 +206,14 @@ ignore f ic = (\is' -> ic { _ignore = is' }) <$> f (_ignore ic)
 
 -------------------------------------------------------------------------------
 -- Events
+
+-- | Construct an event handler.
+eventHandler :: EventType
+  -- ^ Type of event to respond to.
+  -> (UnicodeEvent -> StatefulIRC s ())
+  -- ^ Event handler.
+  -> EventHandler s
+eventHandler = EventHandler
 
 -- | Lens to the match type of an event handler.
 --

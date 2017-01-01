@@ -72,15 +72,15 @@ import Network.IRC.Client.Internal
 -- to process messages representing commands.
 defaultEventHandlers :: [EventHandler s]
 defaultEventHandlers =
-  [ EventHandler EPing    pingHandler
-  , EventHandler ECTCP    ctcpPingHandler
-  , EventHandler ECTCP    ctcpVersionHandler
-  , EventHandler ECTCP    ctcpTimeHandler
-  , EventHandler ENumeric welcomeNick
-  , EventHandler ENumeric joinOnWelcome
-  , EventHandler ENumeric nickMangler
-  , EventHandler ENumeric joinHandler
-  , EventHandler EKick    kickHandler
+  [ eventHandler EPing    pingHandler
+  , eventHandler ECTCP    ctcpPingHandler
+  , eventHandler ECTCP    ctcpVersionHandler
+  , eventHandler ECTCP    ctcpTimeHandler
+  , eventHandler ENumeric welcomeNick
+  , eventHandler ENumeric joinOnWelcome
+  , eventHandler ENumeric nickMangler
+  , eventHandler ENumeric joinHandler
+  , eventHandler EKick    kickHandler
   ]
 
 -- | Respond to server @PING@ messages with a @PONG@.
