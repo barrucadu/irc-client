@@ -98,9 +98,7 @@ data EventType
 
 -- | A function which handles an event.
 data EventHandler s = EventHandler
-  { _description :: Text
-  -- ^ A description of the event handler.
-  , _matchType   :: EventType
+  { _matchType   :: EventType
   -- ^ Which type to be triggered by
   , _eventFunc   :: Event Text -> StatefulIRC s ()
   -- ^ The function to call.

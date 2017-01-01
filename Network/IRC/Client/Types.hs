@@ -47,7 +47,6 @@ module Network.IRC.Client.Types
 
   -- ** Event Handlers
   , EventHandler(..)
-  , description
   , matchType
   , eventFunction
 
@@ -206,12 +205,6 @@ ignore f ic = (\is' -> ic { _ignore = is' }) <$> f (_ignore ic)
 
 -------------------------------------------------------------------------------
 -- Events
-
--- | Lens to the description of an event handler.
---
--- @description :: Lens' (EventHandler s) Text@
-description :: Functor f => (Text -> f Text) -> EventHandler s -> f (EventHandler s)
-description f h = (\d' -> h { _description = d' }) <$> f (_description h)
 
 -- | Lens to the match type of an event handler.
 --
