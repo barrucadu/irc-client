@@ -1,12 +1,10 @@
-{-# LANGUAGE RankNTypes #-}
-
 -- |
 -- Module      : Network.IRC.Client.Types
 -- Copyright   : (c) 2016 Michael Walker
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : RankNTypes
+-- Portability : portable
 ---
 -- Types and lenses for IRC clients. See also
 -- <http://hackage.haskell.org/package/irc-conduit/docs/Network-IRC-Conduit.html Network.IRC.Conduit> and
