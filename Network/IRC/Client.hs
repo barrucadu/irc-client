@@ -45,14 +45,12 @@ module Network.IRC.Client
   , sendBS
   , disconnect
 
-  -- * Defaults
-  , defaultIRCConf
-  , defaultOnConnect
-  , defaultOnDisconnect
-  , defaultEventHandlers
+  -- * Events
+  , module Network.IRC.Client.Events
 
   -- * Types
   , module Network.IRC.Client.Types
+  , defaultIRCConf
 
   -- * Utilities
   , module Network.IRC.Client.Utils
@@ -73,7 +71,7 @@ import Network.Connection as TLS (TLSSettings(..))
 import qualified Network.IRC.Conduit as C
 import qualified Network.TLS as TLS
 
-import Network.IRC.Client.Handlers
+import Network.IRC.Client.Events
 import Network.IRC.Client.Internal
 import Network.IRC.Client.Types
 import Network.IRC.Client.Types.Internal (InstanceConfig(..))

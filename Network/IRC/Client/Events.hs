@@ -2,18 +2,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
--- Module      : Network.IRC.Client.Handlers
--- Copyright   : (c) 2016 Michael Walker
+-- Module      : Network.IRC.Client.Events
+-- Copyright   : (c) 2017 Michael Walker
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
 -- Portability : CPP, OverloadedStrings
 --
--- The default event handlers. Handlers are invoked concurrently when
+-- | Events and event handlers. Handlers are invoked concurrently when
 -- matching events are received from the server.
-module Network.IRC.Client.Handlers
-  ( -- * Event handlers
-    defaultEventHandlers
+module Network.IRC.Client.Events
+  ( -- * Events
+    EventType(..)
+  , eventType
+
+  -- ** Event matching
+  , matchCTCP
+  , matchNumeric
+  , matchType
+
+    -- * Handlers
+  , EventHandler
+  , eventHandler
+
+  -- ** Lenses
+  , eventPredicate
+  , eventFunction
+
+  -- * Default handlers
+  , defaultEventHandlers
+  , defaultOnConnect
+  , defaultOnDisconnect
+
+  -- ** Individual handlers
   , pingHandler
   , ctcpPingHandler
   , ctcpVersionHandler
@@ -22,18 +43,20 @@ module Network.IRC.Client.Handlers
   , joinOnWelcome
   , nickMangler
 
-  -- * Special handlers
-  , defaultOnConnect
-  , defaultOnDisconnect
+  -- * Re-exported
+  , Event(..)
+  , Source(..)
+  , Message(..)
   ) where
 
 import Control.Applicative    ((<$>))
+import Control.Arrow          (first)
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char              (isAlphaNum)
 import Data.Maybe             (fromMaybe)
 import Data.Monoid            ((<>))
-import Data.Text              (Text, breakOn, takeEnd)
+import Data.Text              (Text, breakOn, takeEnd, toUpper)
 import Data.Time.Clock        (getCurrentTime)
 import Data.Time.Format       (formatTime)
 import Network.IRC.CTCP       (fromCTCP)
@@ -47,15 +70,84 @@ import System.Locale    (defaultTimeLocale)
 import qualified Data.Text as T
 
 import Network.IRC.Client.Types
+import Network.IRC.Client.Types.Internal (EventHandler(..))
 import Network.IRC.Client.Utils
 import Network.IRC.Client.Internal
 
--- * Event handlers
+-------------------------------------------------------------------------------
+-- Events
+
+-- | Get the type of an event.
+eventType :: Event a -> EventType
+eventType e = case _message e of
+  (Privmsg _ Right{}) -> EPrivmsg
+  (Privmsg _ Left{})  -> ECTCP
+  (Notice  _ Right{}) -> ENotice
+  (Notice  _ Left{})  -> ECTCP
+
+  Nick{}    -> ENick
+  Join{}    -> EJoin
+  Part{}    -> EPart
+  Quit{}    -> EQuit
+  Mode{}    -> EMode
+  Topic{}   -> ETopic
+  Invite{}  -> EInvite
+  Kick{}    -> EKick
+  Ping{}    -> EPing
+  Pong{}    -> EPong
+  Numeric{} -> ENumeric
+  RawMsg{}  -> ERaw
+
+-- | Match a CTCP PRIVMSG.
+matchCTCP :: [Text] -> Event Text -> Bool
+matchCTCP verbs ev = case _message ev of
+  Privmsg _ (Left ctcpbs) ->
+    let (verb, _) = first toUpper $ fromCTCP ctcpbs
+    in verb `elem` verbs
+  _ -> False
+
+-- | Match a numeric reply.
+matchNumeric :: [Int] -> Event a -> Bool
+matchNumeric nums ev = case _message ev of
+  Numeric num _ -> num `elem` nums
+  _ -> False
+
+-- | A simple predicate to match events of the given type.
+matchType :: EventType -> Event a -> Bool
+matchType etype = (==etype) . eventType
+
+
+-------------------------------------------------------------------------------
+-- Event handlers
+
+-- | Construct an event handler.
+eventHandler
+  :: (Event Text -> Bool)
+  -- ^ Event matching predicate
+  -> (Event Text -> StatefulIRC s ())
+  -- ^ Event handler.
+  -> EventHandler s
+eventHandler = EventHandler
+-- | Lens to the matching predicate of an event handler.
+--
+-- @matchType :: Lens' (EventHandler s) (Event Text -> Bool)@
+eventPredicate :: Functor f => ((Event Text -> Bool) -> f (Event Text -> Bool)) -> EventHandler s -> f (EventHandler s)
+eventPredicate f h = (\mt' -> h { _eventPred = mt' }) <$> f (_eventPred h)
+
+-- | Lens to the handling function of an event handler.
+--
+-- @eventFunction :: Lens' (EventHandler s) (Event Text -> StatefulIRC s ())@
+eventFunction :: Functor f => ((Event Text -> StatefulIRC s ()) -> f (Event Text -> StatefulIRC s ())) -> EventHandler s -> f (EventHandler s)
+eventFunction f h = (\ef' -> h { _eventFunc = ef' }) <$> f (_eventFunc h)
+
+
+-------------------------------------------------------------------------------
+-- Default handlers
 
 -- | The default event handlers, the following are included:
 --
 -- - respond to server @PING@ messages with a @PONG@;
--- - respond to CTCP @PING@ requests with a CTCP @PONG@;
+-- - respond to CTCP @PING@ requests;
 -- - respond to CTCP @VERSION@ requests with the version string;
 -- - respond to CTCP @TIME@ requests with the system time;
 -- - update the nick upon receiving the welcome message, in case the
@@ -64,7 +156,7 @@ import Network.IRC.Client.Internal
 -- - update the channel list on @JOIN@ and @KICK@.
 --
 -- These event handlers are all exposed through the
--- Network.IRC.Client.Handlers module, so you can use them directly if
+-- Network.IRC.Client.Events module, so you can use them directly if
 -- you are building up your 'InstanceConfig' from scratch.
 --
 -- If you are building a bot, you may want to write an event handler
@@ -82,13 +174,28 @@ defaultEventHandlers =
   , eventHandler (matchNumeric [432, 433, 436]) nickMangler
   ]
 
+-- | The default connect handler: set the nick.
+defaultOnConnect :: StatefulIRC s ()
+defaultOnConnect = do
+  iconf <- snapshot instanceConfig =<< getIrcState
+  send . Nick $ get nick iconf
+
+-- | The default disconnect handler: do nothing. You might want to
+-- override this with one which reconnects.
+defaultOnDisconnect :: StatefulIRC s ()
+defaultOnDisconnect = return ()
+
+
+-------------------------------------------------------------------------------
+-- Individual handlers
+
 -- | Respond to server @PING@ messages with a @PONG@.
 pingHandler :: Event Text -> StatefulIRC s ()
 pingHandler ev = case _message ev of
   Ping s1 s2 -> send . Pong $ fromMaybe s1 s2
   _ -> return ()
 
--- | Respond to CTCP @PING@ requests with a CTCP @PONG@.
+-- | Respond to CTCP @PING@ requests.
 ctcpPingHandler :: Event Text -> StatefulIRC s ()
 ctcpPingHandler ev = case (_source ev, _message ev) of
   (User n, Privmsg _ (Left ctcpbs)) ->
@@ -216,20 +323,9 @@ kickHandler ev = do
                                 | otherwise    -> pure ()
       _ -> pure ()
 
--- *Special
 
--- | The default connect handler: set the nick.
-defaultOnConnect :: StatefulIRC s ()
-defaultOnConnect = do
-  iconf <- snapshot instanceConfig =<< getIrcState
-  send . Nick $ get nick iconf
-
--- | The default disconnect handler: do nothing. You might want to
--- override this with one which reconnects.
-defaultOnDisconnect :: StatefulIRC s ()
-defaultOnDisconnect = return ()
-
--- *Utils
+-------------------------------------------------------------------------------
+-- Utils
 
 -- | Break some text on the first occurrence of a substring, removing
 -- the substring from the second portion.

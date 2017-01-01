@@ -81,7 +81,7 @@ data ConnectionState = Connected | Disconnecting | Disconnected
 
 -- | The origin of a message.
 data Origin = FromServer | FromClient
-  deriving (Eq, Read, Show)
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 
 -------------------------------------------------------------------------------

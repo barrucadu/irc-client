@@ -68,7 +68,7 @@ cabal-version:       >=1.10
 library
   -- Modules exported by the library.
   exposed-modules:     Network.IRC.Client
-                     , Network.IRC.Client.Handlers
+                     , Network.IRC.Client.Events
                      , Network.IRC.Client.Internal
                      , Network.IRC.Client.Types
                      , Network.IRC.Client.Types.Internal

@@ -41,35 +41,22 @@ module Network.IRC.Client.Types
   , handlers
   , ignore
 
-  -- * Events
-  , EventType(..)
-  , eventType
-
-  -- ** Event Handlers
-  , EventHandler
-  , eventHandler
-  , matchCTCP
-  , matchNumeric
-  , matchType
-  , eventPredicate
-  , eventFunction
-
   -- * Miscellaneous
+  , EventHandler
+  , EventType(..)
   , Origin(..)
 
-  -- * Re-exported
+  -- * Re-exports
   , Event(..)
-  , Source(..)
   , Message(..)
+  , Source(..)
   ) where
 
 import Control.Applicative        ((<$>))
-import Control.Arrow              (first)
 import Control.Concurrent.STM     (STM, TVar, atomically, readTVar, newTVar)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (ask)
-import Data.Text                  (Text, toUpper)
-import Network.IRC.CTCP           (fromCTCP)
+import Data.Text                  (Text)
 import Network.IRC.Conduit        (Event(..), Message(..), Source(..))
 
 import Network.IRC.Client.Types.Internal
@@ -198,70 +185,11 @@ handlers f ic = (\n' -> ic { _handlers = n' }) <$> f (_handlers ic)
 ignore :: Functor f => ([(Text, Maybe Text)] -> f [(Text, Maybe Text)]) -> InstanceConfig s -> f (InstanceConfig s)
 ignore f ic = (\is' -> ic { _ignore = is' }) <$> f (_ignore ic)
 
+
 -------------------------------------------------------------------------------
--- Events
+-- Miscellaneous
 
 -- | Types of events which can be caught.
 data EventType
   = EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | EPong | ENumeric | ERaw
-  deriving (Eq, Show)
-
--- | Construct an event handler.
-eventHandler
-  :: (Event Text -> Bool)
-  -- ^ Event matching predicate
-  -> (Event Text -> StatefulIRC s ())
-  -- ^ Event handler.
-  -> EventHandler s
-eventHandler = EventHandler
-
--- | A simple predicate to match events of the given type.
-matchType :: EventType -> Event a -> Bool
-matchType etype = (==etype) . eventType
-
--- | Match a numeric reply.
-matchNumeric :: [Int] -> Event a -> Bool
-matchNumeric nums ev = case _message ev of
-  Numeric num _ -> num `elem` nums
-  _ -> False
-
--- | Match a CTCP PRIVMSG.
-matchCTCP :: [Text] -> Event Text -> Bool
-matchCTCP verbs ev = case _message ev of
-  Privmsg _ (Left ctcpbs) ->
-    let (verb, _) = first toUpper $ fromCTCP ctcpbs
-    in verb `elem` verbs
-  _ -> False
-
--- | Lens to the matching predicate of an event handler.
---
--- @matchType :: Lens' (EventHandler s) (Event Text -> Bool)@
-eventPredicate :: Functor f => ((Event Text -> Bool) -> f (Event Text -> Bool)) -> EventHandler s -> f (EventHandler s)
-eventPredicate f h = (\mt' -> h { _eventPred = mt' }) <$> f (_eventPred h)
-
--- | Lens to the handling function of an event handler.
---
--- @eventFunction :: Lens' (EventHandler s) (Event Text -> StatefulIRC s ())@
-eventFunction :: Functor f => ((Event Text -> StatefulIRC s ()) -> f (Event Text -> StatefulIRC s ())) -> EventHandler s -> f (EventHandler s)
-eventFunction f h = (\ef' -> h { _eventFunc = ef' }) <$> f (_eventFunc h)
-
--- | Get the type of an event.
-eventType :: Event a -> EventType
-eventType e = case _message e of
-  (Privmsg _ Right{}) -> EPrivmsg
-  (Privmsg _ Left{})  -> ECTCP
-  (Notice  _ Right{}) -> ENotice
-  (Notice  _ Left{})  -> ECTCP
-
-  Nick{}    -> ENick
-  Join{}    -> EJoin
-  Part{}    -> EPart
-  Quit{}    -> EQuit
-  Mode{}    -> EMode
-  Topic{}   -> ETopic
-  Invite{}  -> EInvite
-  Kick{}    -> EKick
-  Ping{}    -> EPing
-  Pong{}    -> EPong
-  Numeric{} -> ENumeric
-  RawMsg{}  -> ERaw
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)

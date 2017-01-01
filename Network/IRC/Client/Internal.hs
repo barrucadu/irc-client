@@ -154,7 +154,7 @@ isIgnored ircstate ev = do
 
 -- |Get the event handlers for an event.
 getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> StatefulIRC s ()]
-getHandlersFor e ehs = [get eventFunction eh | eh <- ehs, get eventPredicate eh e]
+getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _eventPred eh e]
 
 -- |A conduit which logs everything which goes through it.
 logConduit :: MonadIO m => (a -> IO ()) -> Conduit a m a
