@@ -1,5 +1,17 @@
 {-# LANGUAGE RankNTypes #-}
 
+-- |
+-- Module      : Network.IRC.Client.Types.Internal
+-- Copyright   : (c) 2017 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : RankNTypes
+--
+-- Internal types. Most of these are re-exported elsewhere as lenses.
+--
+-- This module is NOT considered to form part of the public interface
+-- of this library.
 module Network.IRC.Client.Types.Internal where
 
 import Control.Concurrent.STM     (TVar)

@@ -1,5 +1,15 @@
 {-# LANGUAGE RankNTypes #-}
 
+-- |
+-- Module      : Network.IRC.Client.Utils.Lens
+-- Copyright   : (c) 2017 Michael Walker
+-- License     : MIT
+-- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
+-- Stability   : experimental
+-- Portability : RankNTypes
+--
+-- Utilities for dealing with lenses without depending on the lens
+-- library.
 module Network.IRC.Client.Utils.Lens where
 
 import Control.Applicative (Const(..))
