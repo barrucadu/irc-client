@@ -31,6 +31,7 @@ module Network.IRC.Client.Types
   , username
   , realname
   , password
+  , timeout
   , onconnect
   , ondisconnect
   , nick
@@ -43,6 +44,7 @@ module Network.IRC.Client.Types
   , EventHandler
   , EventType(..)
   , Origin(..)
+  , Timeout(..)
 
   -- * Re-exports
   , Event(..)
@@ -52,9 +54,11 @@ module Network.IRC.Client.Types
 
 import Control.Applicative        ((<$>))
 import Control.Concurrent.STM     (STM, TVar, atomically, readTVar, newTVar)
+import Control.Exception          (Exception)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (ask)
 import Data.Text                  (Text)
+import Data.Time.Clock            (NominalDiffTime)
 import Network.IRC.Conduit        (Event(..), Message(..), Source(..))
 
 import Network.IRC.Client.Types.Internal
@@ -131,6 +135,14 @@ realname f cc = (\r' -> cc { _realname = r' }) <$> f (_realname cc)
 password :: Functor f => (Maybe Text -> f (Maybe Text)) -> ConnectionConfig s -> f (ConnectionConfig s)
 password f cc = (\p' -> cc { _password = p' }) <$> f (_password cc)
 
+-- | Lens to the message timeout from the connection config. If no
+-- messages arrive from the server for this period, the client is sent
+-- a 'Timeout' exception and disconnects.
+--
+-- @timeout :: Lens' (ConnectionConfig s) NominalDiffTime@
+timeout :: Functor f => (NominalDiffTime -> f NominalDiffTime) -> ConnectionConfig s -> f (ConnectionConfig s)
+timeout f cc = (\t' -> cc { _timeout = t' }) <$> f (_timeout cc)
+
 -- | Lens to the action to run after connecting to the server. This is
 -- run after sending the `PASS` and `USER` commands to the server. The
 -- default behaviour is to send the `NICK` command.
@@ -191,3 +203,10 @@ ignore f ic = (\is' -> ic { _ignore = is' }) <$> f (_ignore ic)
 data EventType
   = EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | EPong | ENumeric | ERaw
   deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+-- | Exception thrown to kill the client if the timeout elapses with
+-- nothing received from the server.
+data Timeout = Timeout
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+instance Exception Timeout

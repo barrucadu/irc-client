@@ -20,7 +20,7 @@
 module Network.IRC.Client.Internal where
 
 import Control.Applicative        ((<$>))
-import Control.Concurrent         (forkIO)
+import Control.Concurrent         (forkIO, killThread, myThreadId, threadDelay, throwTo)
 import Control.Concurrent.STM     (atomically, readTVar, writeTVar)
 import Control.Exception          (SomeException, catch, throwIO)
 import Control.Monad              (unless, when)
@@ -29,9 +29,10 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
+import Data.IORef                 (IORef, newIORef, readIORef, writeIORef)
 import Data.Text                  (Text)
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
-import Data.Time.Clock            (NominalDiffTime, addUTCTime, getCurrentTime)
+import Data.Time.Clock            (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format           (formatTime)
 import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
 
@@ -45,6 +46,8 @@ import Network.IRC.Client.Types
 import Network.IRC.Client.Types.Internal
 import Network.IRC.Client.Utils.Lens
 
+
+-------------------------------------------------------------------------------
 -- * Connecting to an IRC network
 
 -- | Connect to a server using the supplied connection function.
@@ -76,11 +79,14 @@ connectInternal f oncon ondis logf host port flood = liftIO $ do
     , _server       = host
     , _port         = port
     , _flood        = flood
+    , _timeout      = 300
     , _onconnect    = oncon
     , _ondisconnect = ondis
     , _logfunc      = logf
     }
 
+
+-------------------------------------------------------------------------------
 -- * Event loop
 
 -- | The event loop.
@@ -105,14 +111,30 @@ runner = do
   -- end closes the socket.
   antiflood <- liftIO $ floodProtector (_flood cconf)
 
+  -- An IORef to keep track of the time of the last received message, to allow a local timeout.
+  lastReceived <- liftIO $ newIORef =<< getCurrentTime
+
   let source = toProducer $ sourceTBMChan (_sendqueue cconf)
                           $= antiflood
                           $= logConduit (_logfunc cconf FromClient . toByteString)
   let sink   = forgetful =$= logConduit (_logfunc cconf FromServer . _raw)
-                         =$ eventSink state
+                         =$ eventSink lastReceived state
 
+  -- Fork a thread to disconnect if the timeout elapses.
+  mainTId <- liftIO myThreadId
+  let time  = _timeout cconf
+  let delay = round time
+  let timeoutThread = do
+        now <- getCurrentTime
+        prior <- readIORef lastReceived
+        if diffUTCTime now prior >= time
+          then throwTo mainTId Timeout
+          else threadDelay delay >> timeoutThread
+  timeoutTId <- liftIO (forkIO timeoutThread)
+
+  -- Start the client.
   (exc :: Maybe SomeException) <- liftIO $ catch
-    (_func cconf initialise sink source >> pure Nothing)
+    (_func cconf initialise sink source >> killThread timeoutTId >> pure Nothing)
     (pure . Just)
 
   disconnect
@@ -129,10 +151,15 @@ forgetful = awaitForever go where
 
 -- | Block on receiving a message and invoke all matching handlers
 -- concurrently.
-eventSink :: MonadIO m => IRCState s -> Consumer IrcEvent m ()
-eventSink ircstate = go where
+eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> Consumer IrcEvent m ()
+eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
-    let event'  = decodeUtf8 <$> event
+    -- Record the current time.
+    now <- liftIO getCurrentTime
+    liftIO $ writeIORef lastReceived now
+
+    -- Handle the event.
+    let event' = decodeUtf8 <$> event
     ignored <- isIgnored ircstate event'
     unless ignored $ do
       hs <- getHandlersFor event' . get handlers <$> snapshot instanceConfig ircstate
@@ -194,6 +221,8 @@ fileLogger fp origin x = do
 noopLogger :: a -> b -> IO ()
 noopLogger _ _ = return ()
 
+
+-------------------------------------------------------------------------------
 -- * Messaging
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
@@ -208,6 +237,8 @@ sendBS msg = do
   queue <- _sendqueue . _connectionConfig <$> getIrcState
   liftIO . atomically $ writeTBMChan queue msg
 
+
+-------------------------------------------------------------------------------
 -- * Disconnecting
 
 -- | Disconnect from the server, properly tearing down the TLS session
@@ -224,7 +255,7 @@ disconnect = do
 
       -- Wait for all messages to be sent, or a minute has passed.
       let queueS = _sendqueue (_connectionConfig s)
-      timeout 60 . atomically $ isEmptyTBMChan queueS
+      timeoutBlock 60 . atomically $ isEmptyTBMChan queueS
 
       -- Then close the connection
       disconnectNow
@@ -241,9 +272,13 @@ disconnectNow = do
     closeTBMChan queueS
     writeTVar (_connectionState s) Disconnected
 
+
+-------------------------------------------------------------------------------
+-- * Utils
+
 -- | Block until an action is successful or a timeout is reached.
-timeout :: MonadIO m => NominalDiffTime -> IO Bool -> m ()
-timeout dt check = liftIO $ do
+timeoutBlock :: MonadIO m => NominalDiffTime -> IO Bool -> m ()
+timeoutBlock dt check = liftIO $ do
   finish <- addUTCTime dt <$> getCurrentTime
   let wait = do
         now  <- getCurrentTime

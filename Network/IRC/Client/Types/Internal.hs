@@ -63,7 +63,10 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ Client password
   , _flood      :: NominalDiffTime
   -- ^ The minimum time between two adjacent messages.
-  , _onconnect :: StatefulIRC s ()
+  , _timeout    :: NominalDiffTime
+  -- ^ The maximum time between received messages from the server
+  -- before disconnect.
+  , _onconnect  :: StatefulIRC s ()
   -- ^ Action to run after successfully connecting to the server and
   -- setting the nick.
   , _ondisconnect :: StatefulIRC s ()
