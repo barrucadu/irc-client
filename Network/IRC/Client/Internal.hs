@@ -141,7 +141,7 @@ eventSink ircstate = go where
     unless disconnected go)
 
 -- | Check if an event is ignored or not.
-isIgnored :: MonadIO m => IRCState s -> UnicodeEvent -> m Bool
+isIgnored :: MonadIO m => IRCState s -> Event Text -> m Bool
 isIgnored ircstate ev = do
   iconf <- liftIO . atomically . readTVar . _instanceConfig $ ircstate
   let ignoreList = _ignore iconf
@@ -153,7 +153,7 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |Get the event handlers for an event.
-getHandlersFor :: Event Text -> [EventHandler s] -> [UnicodeEvent -> StatefulIRC s ()]
+getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> StatefulIRC s ()]
 getHandlersFor e ehs = [get eventFunction eh | eh <- ehs, get eventPredicate eh e]
 
 -- |A conduit which logs everything which goes through it.
@@ -196,7 +196,7 @@ noopLogger _ _ = return ()
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
-send :: UnicodeMessage -> StatefulIRC s ()
+send :: Message Text -> StatefulIRC s ()
 send = sendBS . fmap encodeUtf8
 
 -- | Send a message, using TLS if enabled. This blocks if messages are

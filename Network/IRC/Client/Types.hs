@@ -56,9 +56,6 @@ module Network.IRC.Client.Types
 
   -- * Miscellaneous
   , Origin(..)
-  , UnicodeEvent
-  , UnicodeSource
-  , UnicodeMessage
 
   -- * Re-exported
   , Event(..)
@@ -76,14 +73,6 @@ import Network.IRC.CTCP           (fromCTCP)
 import Network.IRC.Conduit        (Event(..), Message(..), Source(..))
 
 import Network.IRC.Client.Types.Internal
-
--------------------------------------------------------------------------------
--- Type synonyms
-
-type UnicodeEvent   = Event Text
-type UnicodeSource  = Source Text
-type UnicodeMessage = Message Text
-
 
 -------------------------------------------------------------------------------
 -- The IRC monad
@@ -219,9 +208,9 @@ data EventType
 
 -- | Construct an event handler.
 eventHandler
-  :: (UnicodeEvent -> Bool)
+  :: (Event Text -> Bool)
   -- ^ Event matching predicate
-  -> (UnicodeEvent -> StatefulIRC s ())
+  -> (Event Text -> StatefulIRC s ())
   -- ^ Event handler.
   -> EventHandler s
 eventHandler = EventHandler
@@ -237,7 +226,7 @@ matchNumeric nums ev = case _message ev of
   _ -> False
 
 -- | Match a CTCP PRIVMSG.
-matchCTCP :: [Text] -> UnicodeEvent -> Bool
+matchCTCP :: [Text] -> Event Text -> Bool
 matchCTCP verbs ev = case _message ev of
   Privmsg _ (Left ctcpbs) ->
     let (verb, _) = first toUpper $ fromCTCP ctcpbs
@@ -246,14 +235,14 @@ matchCTCP verbs ev = case _message ev of
 
 -- | Lens to the matching predicate of an event handler.
 --
--- @matchType :: Lens' (EventHandler s) (UnicodeEvent -> Bool)@
-eventPredicate :: Functor f => ((UnicodeEvent -> Bool) -> f (UnicodeEvent -> Bool)) -> EventHandler s -> f (EventHandler s)
+-- @matchType :: Lens' (EventHandler s) (Event Text -> Bool)@
+eventPredicate :: Functor f => ((Event Text -> Bool) -> f (Event Text -> Bool)) -> EventHandler s -> f (EventHandler s)
 eventPredicate f h = (\mt' -> h { _eventPred = mt' }) <$> f (_eventPred h)
 
 -- | Lens to the handling function of an event handler.
 --
--- @eventFunction :: Lens' (EventHandler s) (UnicodeEvent -> StatefulIRC s ())@
-eventFunction :: Functor f => ((UnicodeEvent -> StatefulIRC s ()) -> f (UnicodeEvent -> StatefulIRC s ())) -> EventHandler s -> f (EventHandler s)
+-- @eventFunction :: Lens' (EventHandler s) (Event Text -> StatefulIRC s ())@
+eventFunction :: Functor f => ((Event Text -> StatefulIRC s ()) -> f (Event Text -> StatefulIRC s ())) -> EventHandler s -> f (EventHandler s)
 eventFunction f h = (\ef' -> h { _eventFunc = ef' }) <$> f (_eventFunc h)
 
 -- | Get the type of an event.

@@ -91,7 +91,7 @@ addHandler handler = do
     modifyTVar tvarI (modify handlers (handler:))
 
 -- | Send a message to the source of an event.
-reply :: UnicodeEvent -> Text -> StatefulIRC s ()
+reply :: Event Text -> Text -> StatefulIRC s ()
 reply ev txt = case _source ev of
   Channel c _ -> mapM_ (send . Privmsg c . Right) $ T.lines txt
   User n      -> mapM_ (send . Privmsg n . Right) $ T.lines txt
@@ -102,11 +102,11 @@ reply ev txt = case _source ev of
 -- CTCPs
 
 -- | Construct a @PRIVMSG@ containing a CTCP
-ctcp :: Text -> Text -> [Text] -> UnicodeMessage
+ctcp :: Text -> Text -> [Text] -> Message Text
 ctcp t command args = Privmsg t . Left $ toCTCP command args
 
 -- | Construct a @NOTICE@ containing a CTCP
-ctcpReply :: Text -> Text -> [Text] -> UnicodeMessage
+ctcpReply :: Text -> Text -> [Text] -> Message Text
 ctcpReply t command args = Notice t . Left $ toCTCP command args
 
 
