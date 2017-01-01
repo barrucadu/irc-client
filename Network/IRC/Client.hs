@@ -222,9 +222,6 @@ start' = liftIO . runReaderT runner
 defaultIRCConf :: Text -> InstanceConfig s
 defaultIRCConf n = InstanceConfig
   { _nick     = n
-  , _username = n
-  , _realname = n
-  , _password = Nothing
   , _channels = []
   , _version  = "irc-client-0.4.4"
   , _handlers = defaultEventHandlers

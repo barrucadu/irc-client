@@ -70,6 +70,9 @@ connectInternal f oncon ondis logf host port flood = liftIO $ do
   return ConnectionConfig
     { _func         = f
     , _sendqueue    = queueS
+    , _username     = "irc-client"
+    , _realname     = "irc-client"
+    , _password     = Nothing
     , _server       = host
     , _port         = port
     , _flood        = flood
@@ -84,13 +87,12 @@ connectInternal f oncon ondis logf host port flood = liftIO $ do
 runner :: StatefulIRC s ()
 runner = do
   state <- getIrcState
-  iconf <- snapshot instanceConfig state
   let cconf = _connectionConfig state
 
   -- Set the real- and user-name
-  let theUser = get username iconf
-  let theReal = get realname iconf
-  let thePass = get password iconf
+  let theUser = get username cconf
+  let theReal = get realname cconf
+  let thePass = get password cconf
 
   -- Initialise the IRC session
   let initialise = flip runReaderT state $ do

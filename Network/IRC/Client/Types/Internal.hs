@@ -55,6 +55,12 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ The server host.
   , _port       :: Int
   -- ^ The server port.
+  , _username   :: Text
+  -- ^ Client username
+  , _realname   :: Text
+  -- ^ Client realname
+  , _password   :: Maybe Text
+  -- ^ Client password
   , _flood      :: NominalDiffTime
   -- ^ The minimum time between two adjacent messages.
   , _onconnect :: StatefulIRC s ()
@@ -70,12 +76,6 @@ data ConnectionConfig s = ConnectionConfig
 data InstanceConfig s = InstanceConfig
   { _nick     :: Text
   -- ^ Client nick
-  , _username :: Text
-  -- ^ Client username
-  , _realname :: Text
-  -- ^ Client realname
-  , _password :: Maybe Text
-  -- ^ Client password
   , _channels :: [Text]
   -- ^ Current channels
   , _version  :: Text

@@ -28,12 +28,12 @@ module Network.IRC.Client.Types
   -- ** Lenses
   , instanceConfig
   , userState
-  , onconnect
-  , ondisconnect
-  , nick
   , username
   , realname
   , password
+  , onconnect
+  , ondisconnect
+  , nick
   , channels
   , version
   , handlers
@@ -110,6 +110,27 @@ instanceConfig f s = (\ic' -> s { _instanceConfig = ic' }) <$> f (_instanceConfi
 userState :: Functor f => (TVar s -> f (TVar s)) -> IRCState s -> f (IRCState s)
 userState f s = (\us' -> s { _userState = us' }) <$> f (_userState s)
 
+-- | Lens to the username from the connection config. The username is
+-- sent to the server during the initial set-up.
+--
+-- @username :: Lens' (ConnectionConfig s) Text@
+username :: Functor f => (Text -> f Text) -> ConnectionConfig s -> f (ConnectionConfig s)
+username f cc = (\u' -> cc { _username = u' }) <$> f (_username cc)
+
+-- | Lens to the realname from the connection config. The realname is
+-- sent to the server during the initial set-up.
+--
+-- @realname :: Lens' (ConnectionConfig s) Text@
+realname :: Functor f => (Text -> f Text) -> ConnectionConfig s -> f (ConnectionConfig s)
+realname f cc = (\r' -> cc { _realname = r' }) <$> f (_realname cc)
+
+-- | Lens to the password from the connection config. The password is
+-- sent to the server during the initial set-up.
+--
+-- @password :: Lens' (ConnectionConfig s) (Maybe Text)@
+password :: Functor f => (Maybe Text -> f (Maybe Text)) -> ConnectionConfig s -> f (ConnectionConfig s)
+password f cc = (\p' -> cc { _password = p' }) <$> f (_password cc)
+
 -- | Lens to the action to run after connecting to the server. This is
 -- run after sending the `PASS` and `USER` commands to the server. The
 -- default behaviour is to send the `NICK` command.
@@ -132,27 +153,6 @@ ondisconnect f cc = (\od' -> cc { _ondisconnect = od' }) <$> f (_ondisconnect cc
 -- @nick :: Lens' (InstanceConfig s) Text@
 nick :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
 nick f ic = (\n' -> ic { _nick = n' }) <$> f (_nick ic)
-
--- | Lens to the username from the instance config. The username is
--- sent to the server during the initial set-up.
---
--- @username :: Lens' (InstanceConfig s) Text@
-username :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
-username f ic = (\u' -> ic { _username = u' }) <$> f (_username ic)
-
--- | Lens to the realname from the instance config. The realname is
--- sent to the server during the initial set-up.
---
--- @realname :: Lens' (InstanceConfig s) Text@
-realname :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
-realname f ic = (\r' -> ic { _realname = r' }) <$> f (_realname ic)
-
--- | Lens to the password nick from the instance config. The password
--- is sent to the server during the initial set-up.
---
--- @password :: Lens' (InstanceConfig s) (Maybe Text)@
-password :: Functor f => (Maybe Text -> f (Maybe Text)) -> InstanceConfig s -> f (InstanceConfig s)
-password f ic = (\p' -> ic { _password = p' }) <$> f (_password ic)
 
 -- | Lens to the channels from the instance config. This list both
 -- determines the channels to join on connect, and is modified by the
