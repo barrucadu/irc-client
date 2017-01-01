@@ -14,7 +14,7 @@
 -- > run host port nick = do
 -- >   conn <- connect host port 1
 -- >   let cfg = defaultIRCConf nick
--- >   let cfg' = cfg { _eventHandlers = yourCustomEventHandlers : _eventHandlers cfg }
+-- >   let cfg' = modify handlers (yourCustomEventHandlers:) cfg
 -- >   start conn cfg'
 --
 -- You shouldn't really need to tweak anything other than the event
@@ -69,13 +69,15 @@ import Data.Time.Clock            (NominalDiffTime)
 import qualified Data.X509 as X
 import qualified Data.X509.CertificateStore as X
 import qualified Data.X509.Validation as X
-import qualified Network.Connection as TLS (TLSSettings(..))
+import Network.Connection as TLS (TLSSettings(..))
+import qualified Network.IRC.Conduit as C
+import qualified Network.TLS as TLS
+
 import Network.IRC.Client.Handlers
 import Network.IRC.Client.Internal
 import Network.IRC.Client.Types
+import Network.IRC.Client.Types.Internal (InstanceConfig(..))
 import Network.IRC.Client.Utils
-import qualified Network.IRC.Conduit as C
-import qualified Network.TLS as TLS
 
 -- * Connecting to an IRC network
 
@@ -221,12 +223,12 @@ start' = liftIO . runReaderT runner
 -- | Construct a default IRC configuration from a nick
 defaultIRCConf :: Text -> InstanceConfig s
 defaultIRCConf n = InstanceConfig
-  { _nick          = n
-  , _username      = n
-  , _realname      = n
-  , _password      = Nothing
-  , _channels      = []
-  , _ctcpVer       = "irc-client-0.4.4"
-  , _eventHandlers = defaultEventHandlers
-  , _ignore        = []
+  { _nick     = n
+  , _username = n
+  , _realname = n
+  , _password = Nothing
+  , _channels = []
+  , _version  = "irc-client-0.4.4"
+  , _handlers = defaultEventHandlers
+  , _ignore   = []
   }

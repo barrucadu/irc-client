@@ -33,13 +33,16 @@ import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
 import Data.Time.Clock            (NominalDiffTime, addUTCTime, getCurrentTime)
 import Data.Time.Format           (formatTime)
 import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
-import Network.IRC.Client.Types
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
 #else
 import System.Locale    (defaultTimeLocale)
 #endif
+
+import Network.IRC.Client.Types
+import Network.IRC.Client.Types.Internal
+import Network.IRC.Client.Utils.Lens
 
 -- * Connecting to an IRC network
 
@@ -60,7 +63,7 @@ connectInternal :: MonadIO m
   -> NominalDiffTime
   -- ^ Flood timeout
   -> m (ConnectionConfig s)
-connectInternal f onconnect ondisconnect logf host port flood = liftIO $ do
+connectInternal f oncon ondis logf host port flood = liftIO $ do
   queueS <- newTBMChanIO 16
 
   return ConnectionConfig
@@ -69,8 +72,8 @@ connectInternal f onconnect ondisconnect logf host port flood = liftIO $ do
     , _server       = host
     , _port         = port
     , _flood        = flood
-    , _onconnect    = onconnect
-    , _ondisconnect = ondisconnect
+    , _onconnect    = oncon
+    , _ondisconnect = ondis
     , _logfunc      = logf
     }
 
@@ -79,41 +82,38 @@ connectInternal f onconnect ondisconnect logf host port flood = liftIO $ do
 -- | The event loop.
 runner :: StatefulIRC s ()
 runner = do
-  state <- ircState
+  state <- getIrcState
+  iconf <- snapshot instanceConfig state
+  let cconf = _connectionConfig state
 
   -- Set the real- and user-name
-  theUser  <- _username <$> instanceConfig
-  theReal  <- _realname <$> instanceConfig
-  password <- _password <$> instanceConfig
+  let theUser = get username iconf
+  let theReal = get realname iconf
+  let thePass = get password iconf
 
   -- Initialise the IRC session
   let initialise = flip runReaderT state $ do
-        liftIO . atomically $ writeTVar (_connState state) Connected
-        mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) password
+        liftIO . atomically $ writeTVar (_connectionState state) Connected
+        mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
-        _onconnect =<< connectionConfig
+        _onconnect cconf
 
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
-  cconf <- connectionConfig
-  let flood = _flood     cconf
-  let func  = _func      cconf
-  let logf  = _logfunc   cconf
-  let queue = _sendqueue cconf
+  antiflood <- liftIO $ floodProtector (_flood cconf)
 
-  antiflood <- liftIO $ floodProtector flood
-
-  dchandler <- _ondisconnect <$> connectionConfig
-
-  let source = toProducer $ sourceTBMChan queue $= antiflood $= logConduit (logf FromClient . toByteString)
-  let sink   = forgetful =$= logConduit (logf FromServer . _raw) =$ eventSink state
+  let source = toProducer $ sourceTBMChan (_sendqueue cconf)
+                          $= antiflood
+                          $= logConduit (_logfunc cconf FromClient . toByteString)
+  let sink   = forgetful =$= logConduit (_logfunc cconf FromServer . _raw)
+                         =$ eventSink state
 
   (exc :: Maybe SomeException) <- liftIO $ catch
-    (func initialise sink source >> pure Nothing)
+    (_func cconf initialise sink source >> pure Nothing)
     (pure . Just)
 
   disconnect
-  dchandler
+  _ondisconnect cconf
 
   -- If the connection terminated due to an exception, rethrow it.
   liftIO $ maybe (pure ()) throwIO exc
@@ -132,11 +132,11 @@ eventSink ircstate = go where
     let event'  = decodeUtf8 <$> event
     ignored <- isIgnored ircstate event'
     unless ignored $ do
-      handlers <- getHandlersFor event' . _eventHandlers <$> getInstanceConfig' ircstate
-      liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) handlers
+      hs <- getHandlersFor event' . get handlers <$> snapshot instanceConfig ircstate
+      liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) hs
 
     -- If disconnected, do not loop.
-    disconnected <- (==Disconnected) <$> getConnState ircstate
+    disconnected <- liftIO . atomically $ (==Disconnected) <$> getConnectionState ircstate
     unless disconnected go)
 
 -- | Check if an event is ignored or not.
@@ -202,7 +202,7 @@ send = sendBS . fmap encodeUtf8
 -- sent too rapidly.
 sendBS :: IrcMessage -> StatefulIRC s ()
 sendBS msg = do
-  queue <- _sendqueue <$> connectionConfig
+  queue <- _sendqueue . _connectionConfig <$> getIrcState
   liftIO . atomically $ writeTBMChan queue msg
 
 -- * Disconnecting
@@ -211,16 +211,16 @@ sendBS msg = do
 -- (if there is one).
 disconnect :: StatefulIRC s ()
 disconnect = do
-  s <- ircState
+  s <- getIrcState
 
-  connState <- liftIO . atomically . readTVar $ _connState s
+  connState <- liftIO . atomically . readTVar $ _connectionState s
   case connState of
     Connected -> do
       -- Set the state to @Disconnecting@
-      liftIO . atomically $ writeTVar (_connState s) Disconnecting
+      liftIO . atomically $ writeTVar (_connectionState s) Disconnecting
 
       -- Wait for all messages to be sent, or a minute has passed.
-      queueS <- _sendqueue <$> connectionConfig
+      let queueS = _sendqueue (_connectionConfig s)
       timeout 60 . atomically $ isEmptyTBMChan queueS
 
       -- Then close the connection
@@ -232,11 +232,11 @@ disconnect = do
 -- | Disconnect immediately, without waiting for messages to be sent.
 disconnectNow :: StatefulIRC s ()
 disconnectNow = do
-  queueS <- _sendqueue <$> connectionConfig
-  liftIO . atomically $ closeTBMChan queueS
-
-  s <- ircState
-  liftIO . atomically $ writeTVar (_connState s) Disconnected
+  s <- getIrcState
+  liftIO . atomically $ do
+    let queueS = _sendqueue (_connectionConfig s)
+    closeTBMChan queueS
+    writeTVar (_connectionState s) Disconnected
 
 -- | Block until an action is successful or a timeout is reached.
 timeout :: MonadIO m => NominalDiffTime -> IO Bool -> m ()

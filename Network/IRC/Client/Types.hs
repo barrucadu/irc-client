@@ -8,11 +8,54 @@
 -- Stability   : experimental
 -- Portability : RankNTypes
 ---
--- Types for IRC clients. See also
+-- Types and lenses for IRC clients. See also
 -- <http://hackage.haskell.org/package/irc-conduit/docs/Network-IRC-Conduit.html Network.IRC.Conduit> and
--- <http://hackage.haskell.org/package/irc-ctcp-0.1.2.1/docs/Network-IRC-CTCP.html Network.IRC.CTCP>.
+-- <http://hackage.haskell.org/package/irc-ctcp/docs/Network-IRC-CTCP.html Network.IRC.CTCP>.
 module Network.IRC.Client.Types
-  ( module Network.IRC.Client.Types
+  ( -- * The IRC monad
+    IRC
+  , StatefulIRC
+  , getIrcState
+
+  -- * State
+  , IRCState
+  , ConnectionState(..)
+  , ConnectionConfig
+  , InstanceConfig
+  , newIRCState
+
+  -- ** Getters
+  , getConnectionState
+
+  -- ** Lenses
+  , instanceConfig
+  , userState
+  , onconnect
+  , ondisconnect
+  , nick
+  , username
+  , realname
+  , password
+  , channels
+  , version
+  , handlers
+  , ignore
+
+  -- * Events
+  , EventType(..)
+  , eventType
+
+  -- ** Event Handlers
+  , EventHandler(..)
+  , description
+  , matchType
+  , eventFunction
+
+  -- * Miscellaneous
+  , Origin(..)
+  , UnicodeEvent
+  , UnicodeSource
+  , UnicodeMessage
 
   -- * Re-exported
   , Event(..)
@@ -21,42 +64,30 @@ module Network.IRC.Client.Types
   ) where
 
 import Control.Applicative        ((<$>))
-import Control.Concurrent.STM     (TVar, atomically, readTVar, newTVar, writeTVar)
+import Control.Concurrent.STM     (STM, TVar, atomically, readTVar, newTVar)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
-import Control.Monad.Trans.Reader (ReaderT, ask)
-import Data.ByteString            (ByteString)
-import Data.Conduit               (Consumer, Producer)
-import Data.Conduit.TMChan        (TBMChan)
+import Control.Monad.Trans.Reader (ask)
 import Data.Text                  (Text)
-import Data.Time.Clock            (NominalDiffTime)
-import Network.IRC.Conduit        (Event(..), Message(..), Source(..), IrcEvent, IrcMessage)
+import Network.IRC.Conduit        (Event(..), Message(..), Source(..))
 
--- *Type synonyms
+import Network.IRC.Client.Types.Internal
+
+-------------------------------------------------------------------------------
+-- Type synonyms
+
 type UnicodeEvent   = Event Text
 type UnicodeSource  = Source Text
 type UnicodeMessage = Message Text
 
--- *State
+
+-------------------------------------------------------------------------------
+-- The IRC monad
 
 -- | The IRC monad.
 type IRC a = StatefulIRC () a
 
--- | The IRC monad, with state.
-type StatefulIRC s a = ReaderT (IRCState s) IO a
-
-data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
-                           -- ^Read-only connection configuration
-                           , _userState :: TVar s
-                           -- ^Mutable user state
-                           , _instanceConfig   :: TVar (InstanceConfig s)
-                           -- ^Mutable instance configuration in STM
-                           , _connState :: TVar ConnectionState
-                           -- ^State of the connection.
-                           }
-
--- | The state of the connection.
-data ConnectionState = Connected | Disconnecting | Disconnected
-  deriving (Bounded, Enum, Eq, Ord, Read, Show)
+-------------------------------------------------------------------------------
+-- State
 
 -- | Construct a new IRC state
 newIRCState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IRCState s)
@@ -65,133 +96,134 @@ newIRCState cconf iconf ustate = do
   ictvar <- liftIO . atomically . newTVar $ iconf
   cstvar <- liftIO . atomically . newTVar $ Disconnected
 
-  return IRCState
+  pure IRCState
     { _connectionConfig = cconf
     , _userState        = ustvar
     , _instanceConfig   = ictvar
-    , _connState        = cstvar
+    , _connectionState  = cstvar
     }
 
+
+-------------------------------------------------------------------------------
+-- State Getters
+
 -- | Access the client state.
-ircState :: StatefulIRC s (IRCState s)
-ircState = ask
+getIrcState :: StatefulIRC s (IRCState s)
+getIrcState = ask
 
--- | Extract the connection configuration from an IRC state
-getConnectionConfig :: IRCState s -> ConnectionConfig s
-getConnectionConfig = _connectionConfig
+-- | Get the connection state from an IRC state.
+getConnectionState :: IRCState s -> STM ConnectionState
+getConnectionState = readTVar . _connectionState
 
--- | Extract the instance configuration from an IRC state
-getInstanceConfig :: IRCState s -> TVar (InstanceConfig s)
-getInstanceConfig = _instanceConfig
 
--- | Extract the user state from an IRC state
-getUserState :: IRCState s -> TVar s
-getUserState = _userState
+-------------------------------------------------------------------------------
+-- State Lenses
 
--- | Extract the connection state from an IRC state.
-getConnState :: MonadIO m => IRCState s -> m ConnectionState
-getConnState = liftIO . atomically . readTVar . _connState
+-- | Lens to the instance configuration from an IRC state.
+--
+-- @instanceConfig :: Lens' (IRCState s) (TVar (InstanceConfig s))@
+instanceConfig :: Functor f => (TVar (InstanceConfig s) -> f (TVar (InstanceConfig s))) -> IRCState s -> f (IRCState s)
+instanceConfig f s = (\ic' -> s { _instanceConfig = ic' }) <$> f (_instanceConfig s)
 
--- | Extract the current snapshot of the instance configuration from
--- an IRC state
-getInstanceConfig' :: MonadIO m => IRCState s -> m (InstanceConfig s)
-getInstanceConfig' = liftIO . atomically . readTVar . _instanceConfig
+-- | Lens to the user state from an IRC state.
+--
+-- @userState :: Lens' (IRCState s) (TVar s)@
+userState :: Functor f => (TVar s -> f (TVar s)) -> IRCState s -> f (IRCState s)
+userState f s = (\us' -> s { _userState = us' }) <$> f (_userState s)
 
--- | Access the connection config
-connectionConfig :: StatefulIRC s (ConnectionConfig s)
-connectionConfig = _connectionConfig <$> ask
+-- | Lens to the action to run after connecting to the server. This is
+-- run after sending the `PASS` and `USER` commands to the server. The
+-- default behaviour is to send the `NICK` command.
+--
+-- @onconnect :: Lens' (ConnectionConfig s) (StatefulIRC s ())@
+onconnect :: Functor f => (StatefulIRC s () -> f (StatefulIRC s ())) -> ConnectionConfig s -> f (ConnectionConfig s)
+onconnect f cc = (\oc' -> cc { _onconnect = oc' }) <$> f (_onconnect cc)
 
--- | Access the instance config TVar
-instanceConfigTVar :: StatefulIRC s (TVar (InstanceConfig s))
-instanceConfigTVar = _instanceConfig <$> ask
+-- | Lens to the action to run after disconnecting from the server,
+-- both by local choice and by losing the connection. This is run
+-- after tearing down the connection. The default behaviour is to do
+-- nothing.
+--
+-- @ondisconnect :: Lens' (ConnectionConfig s) (StatefulIRC s ())@
+ondisconnect :: Functor f => (StatefulIRC s () -> f (StatefulIRC s ())) -> ConnectionConfig s -> f (ConnectionConfig s)
+ondisconnect f cc = (\od' -> cc { _ondisconnect = od' }) <$> f (_ondisconnect cc)
 
--- | Access the instance config as it is right now.
-instanceConfig :: StatefulIRC s (InstanceConfig s)
-instanceConfig = instanceConfigTVar >>= liftIO . atomically . readTVar
+-- | Lens to the nick from the instance config.
+--
+-- @nick :: Lens' (InstanceConfig s) Text@
+nick :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
+nick f ic = (\n' -> ic { _nick = n' }) <$> f (_nick ic)
 
--- | Overwrite the instance config, even if it has changed since we
--- looked at it.
-putInstanceConfig :: InstanceConfig s -> StatefulIRC s ()
-putInstanceConfig iconf = instanceConfigTVar >>= liftIO . atomically . flip writeTVar iconf
+-- | Lens to the username from the instance config. The username is
+-- sent to the server during the initial set-up.
+--
+-- @username :: Lens' (InstanceConfig s) Text@
+username :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
+username f ic = (\u' -> ic { _username = u' }) <$> f (_username ic)
 
--- | Access the user state.
-stateTVar :: StatefulIRC s (TVar s)
-stateTVar = _userState <$> ask
+-- | Lens to the realname from the instance config. The realname is
+-- sent to the server during the initial set-up.
+--
+-- @realname :: Lens' (InstanceConfig s) Text@
+realname :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
+realname f ic = (\r' -> ic { _realname = r' }) <$> f (_realname ic)
 
--- | Access the user state as it is right now.
-state :: StatefulIRC s s
-state = stateTVar >>= liftIO . atomically . readTVar
+-- | Lens to the password nick from the instance config. The password
+-- is sent to the server during the initial set-up.
+--
+-- @password :: Lens' (InstanceConfig s) (Maybe Text)@
+password :: Functor f => (Maybe Text -> f (Maybe Text)) -> InstanceConfig s -> f (InstanceConfig s)
+password f ic = (\p' -> ic { _password = p' }) <$> f (_password ic)
 
--- | Set the user state.
-putState :: s -> StatefulIRC s ()
-putState s = stateTVar >>= liftIO . atomically . flip writeTVar s
+-- | Lens to the channels from the instance config. This list both
+-- determines the channels to join on connect, and is modified by the
+-- default event handlers when channels are joined or parted.
+--
+-- @channels :: Lens' (InstanceConfig s) [Text]@
+channels :: Functor f => ([Text] -> f [Text]) -> InstanceConfig s -> f (InstanceConfig s)
+channels f ic = (\cs' -> ic { _channels = cs' }) <$> f (_channels ic)
 
--- | The origin of a message.
-data Origin = FromServer | FromClient
-  deriving (Eq, Read, Show)
+-- | Lens to the version from the instance config. The version is sent
+-- in response to the CTCP \"VERSION\" request by the default event
+-- handlers.
+--
+-- @version :: Lens' (InstanceConfig s) Text@
+version :: Functor f => (Text -> f Text) -> InstanceConfig s -> f (InstanceConfig s)
+version f ic = (\v' -> ic { _version = v' }) <$> f (_version ic)
 
--- | The static state of an IRC server connection.
-data ConnectionConfig s = ConnectionConfig
-  { _func       :: IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
-  -- ^ Function to connect and start the conduits.
-  , _sendqueue  :: TBMChan IrcMessage
-  -- ^ Message send queue.
-  , _server     :: ByteString
-  -- ^ The server host.
-  , _port       :: Int
-  -- ^ The server port.
-  , _flood      :: NominalDiffTime
-  -- ^ The minimum time between two adjacent messages.
-  , _onconnect :: StatefulIRC s ()
-  -- ^ Action to run after successfully connecting to the server and
-  -- setting the nick.
-  , _ondisconnect :: StatefulIRC s ()
-  -- ^ Action to run if the remote server closes the connection.
-  , _logfunc    :: Origin -> ByteString -> IO ()
-  -- ^ Function to log messages sent to and received from the server.
-  }
+-- | Lens to the event handlers from the instance config.
+--
+-- @handlers :: Lens' (InstanceConfig s) [EventHandler s]@
+handlers :: Functor f => ([EventHandler s] -> f [EventHandler s]) -> InstanceConfig s -> f (InstanceConfig s)
+handlers f ic = (\n' -> ic { _handlers = n' }) <$> f (_handlers ic)
 
--- | The updateable state of an IRC connection.
-data InstanceConfig s = InstanceConfig
-  { _nick     :: Text
-  -- ^ Client nick
-  , _username :: Text
-  -- ^ Client username
-  , _realname :: Text
-  -- ^ Client realname
-  , _password :: Maybe Text
-  -- ^ Client password
-  , _channels :: [Text]
-  -- ^ Current channels
-  , _ctcpVer  :: Text
-  -- ^ Response to CTCP VERSION
-  , _eventHandlers :: [EventHandler s]
-  -- ^ The registered event handlers
-  , _ignore   :: [(Text, Maybe Text)]
-  -- ^ List of nicks (optionally restricted to channels) to ignore
-  -- messages from. No channel = global.
-  }
+-- | Lens to the ignore list from the instance config. This is a list
+-- of nicks with optional channel restrictions.
+--
+-- @ignore :: Lens' (InstanceConfig s) [(Text, Maybe Text)]@
+ignore :: Functor f => ([(Text, Maybe Text)] -> f [(Text, Maybe Text)]) -> InstanceConfig s -> f (InstanceConfig s)
+ignore f ic = (\is' -> ic { _ignore = is' }) <$> f (_ignore ic)
 
--- *Events
+-------------------------------------------------------------------------------
+-- Events
 
--- | Types of events which can be caught.
-data EventType
-  = EEverything
-  -- ^ Match all events
-  | ENothing
-  -- ^ Match no events
-  | EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | ENumeric
-  deriving (Eq, Show)
+-- | Lens to the description of an event handler.
+--
+-- @description :: Lens' (EventHandler s) Text@
+description :: Functor f => (Text -> f Text) -> EventHandler s -> f (EventHandler s)
+description f h = (\d' -> h { _description = d' }) <$> f (_description h)
 
--- | A function which handles an event.
-data EventHandler s = EventHandler
-  { _description :: Text
-  -- ^ A description of the event handler.
-  , _matchType   :: EventType
-  -- ^ Which type to be triggered by
-  , _eventFunc   :: UnicodeEvent -> StatefulIRC s ()
-  -- ^ The function to call.
-  }
+-- | Lens to the match type of an event handler.
+--
+-- @matchType :: Lens' (EventHandler s) MatchType@
+matchType :: Functor f => (EventType -> f EventType) -> EventHandler s -> f (EventHandler s)
+matchType f h = (\mt' -> h { _matchType = mt' }) <$> f (_matchType h)
+
+-- | Lens to the handling function of an event handler.
+--
+-- @eventFunction :: Lens' (EventHandler s) (UnicodeEvent -> StatefulIRC s ())@
+eventFunction :: Functor f => ((UnicodeEvent -> StatefulIRC s ()) -> f (UnicodeEvent -> StatefulIRC s ())) -> EventHandler s -> f (EventHandler s)
+eventFunction f h = (\ef' -> h { _eventFunc = ef' }) <$> f (_eventFunc h)
 
 -- | Get the type of an event.
 eventType :: Event a -> EventType

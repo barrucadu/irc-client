@@ -29,8 +29,7 @@ module Network.IRC.Client.Handlers
 
 import Control.Applicative    ((<$>))
 import Control.Arrow          (first)
-import Control.Concurrent.STM (atomically, readTVar, writeTVar)
-import Control.Monad          (unless)
+import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char              (isAlphaNum)
 import Data.Maybe             (fromMaybe)
@@ -39,9 +38,6 @@ import Data.Text              (Text, breakOn, takeEnd, toUpper)
 import Data.Time.Clock        (getCurrentTime)
 import Data.Time.Format       (formatTime)
 import Network.IRC.CTCP       (fromCTCP)
-import Network.IRC.Client.Types
-import Network.IRC.Client.Utils
-import Network.IRC.Client.Internal
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
@@ -50,6 +46,10 @@ import System.Locale    (defaultTimeLocale)
 #endif
 
 import qualified Data.Text as T
+
+import Network.IRC.Client.Types
+import Network.IRC.Client.Utils
+import Network.IRC.Client.Internal
 
 -- * Event handlers
 
@@ -97,7 +97,7 @@ ctcpPingHandler = ctcpHandler [("PING", return)]
 ctcpVersionHandler :: UnicodeEvent -> StatefulIRC s ()
 ctcpVersionHandler = ctcpHandler [("VERSION", go)] where
   go _ = do
-    ver <- _ctcpVer <$> instanceConfig
+    ver <- get version <$> (snapshot instanceConfig =<< getIrcState)
     return [ver]
 
 -- | Respond to CTCP @TIME@ requests with the system time.
@@ -112,11 +112,9 @@ ctcpTimeHandler = ctcpHandler [("TIME", go)] where
 welcomeNick :: UnicodeEvent -> StatefulIRC s ()
 welcomeNick = numHandler [(001, go)] where
   go (srvNick:_) = do
-    tvarI <- instanceConfigTVar
-
-    liftIO . atomically $ do
-      iconf <- readTVar tvarI
-      writeTVar tvarI iconf { _nick = srvNick }
+    tvarI <- get instanceConfig <$> getIrcState
+    liftIO . atomically $
+      modifyTVar tvarI (set nick srvNick)
   go _ = return ()
 
 -- | Join default channels upon welcome (numeric reply 001). If sent earlier,
@@ -124,8 +122,8 @@ welcomeNick = numHandler [(001, go)] where
 joinOnWelcome :: UnicodeEvent -> StatefulIRC s ()
 joinOnWelcome = numHandler [(001, go)] where
   go _ = do
-    iconf <- instanceConfig
-    mapM_ (send . Join) $ _channels iconf
+    iconf <- snapshot instanceConfig =<< getIrcState
+    mapM_ (send . Join) $ get channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
@@ -136,7 +134,7 @@ nickMangler = numHandler [ (432, go fresh)
                          ]
   where
     go f (_:srvNick:_) = do
-      theNick <- _nick <$> instanceConfig
+      theNick <- get nick <$> (snapshot instanceConfig =<< getIrcState)
 
       -- If the length of our nick and the server's idea of our nick
       -- differ, it was truncated - so calculate the allowable length.
@@ -187,33 +185,33 @@ nickMangler = numHandler [ (432, go fresh)
 joinHandler :: UnicodeEvent -> StatefulIRC s ()
 joinHandler = numHandler [(332, go)] where
   go (c:_) = do
-    tvarI <- instanceConfigTVar
-
-    liftIO . atomically $ do
-      iconf <- readTVar tvarI
-      unless (c `elem` _channels iconf) $
-        writeTVar tvarI iconf { _channels = c : _channels iconf }
+    tvarI <- get instanceConfig <$> getIrcState
+    liftIO . atomically $
+      modifyTVar tvarI $ \iconf ->
+        (if c `elem` get channels iconf
+          then modify channels (c:)
+          else id) iconf
 
   go _ = return ()
 
 -- | Update the channel list upon being kicked.
 kickHandler :: UnicodeEvent -> StatefulIRC s ()
 kickHandler ev = do
-  theNick <- _nick <$> instanceConfig
-  tvarI   <- instanceConfigTVar
-
-  case (_source ev, _message ev) of
-    (Channel c _, Kick n _ _) | n == theNick -> liftIO . atomically $ delChan tvarI c
-                              | otherwise   -> return ()
-    _ -> return ()
+  tvarI <- get instanceConfig <$> getIrcState
+  liftIO . atomically $ do
+    theNick <- get nick <$> readTVar tvarI
+    case (_source ev, _message ev) of
+      (Channel c _, Kick n _ _) | n == theNick -> delChan tvarI c
+                                | otherwise    -> pure ()
+      _ -> pure ()
 
 -- *Special
 
 -- | The default connect handler: set the nick.
 defaultOnConnect :: StatefulIRC s ()
 defaultOnConnect = do
-  iconf <- instanceConfig
-  send . Nick $ _nick iconf
+  iconf <- snapshot instanceConfig =<< getIrcState
+  send . Nick $ get nick iconf
 
 -- | The default disconnect handler: do nothing. You might want to
 -- override this with one which reconnects.
