@@ -48,7 +48,10 @@ module Network.IRC.Client.Types
   -- ** Event Handlers
   , EventHandler
   , eventHandler
+  , matchCTCP
+  , matchNumeric
   , matchType
+  , eventPredicate
   , eventFunction
 
   -- * Miscellaneous
@@ -64,10 +67,12 @@ module Network.IRC.Client.Types
   ) where
 
 import Control.Applicative        ((<$>))
+import Control.Arrow              (first)
 import Control.Concurrent.STM     (STM, TVar, atomically, readTVar, newTVar)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (ask)
-import Data.Text                  (Text)
+import Data.Text                  (Text, toUpper)
+import Network.IRC.CTCP           (fromCTCP)
 import Network.IRC.Conduit        (Event(..), Message(..), Source(..))
 
 import Network.IRC.Client.Types.Internal
@@ -207,19 +212,43 @@ ignore f ic = (\is' -> ic { _ignore = is' }) <$> f (_ignore ic)
 -------------------------------------------------------------------------------
 -- Events
 
+-- | Types of events which can be caught.
+data EventType
+  = EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | EPong | ENumeric | ERaw
+  deriving (Eq, Show)
+
 -- | Construct an event handler.
-eventHandler :: EventType
-  -- ^ Type of event to respond to.
+eventHandler
+  :: (UnicodeEvent -> Bool)
+  -- ^ Event matching predicate
   -> (UnicodeEvent -> StatefulIRC s ())
   -- ^ Event handler.
   -> EventHandler s
 eventHandler = EventHandler
 
--- | Lens to the match type of an event handler.
+-- | A simple predicate to match events of the given type.
+matchType :: EventType -> Event a -> Bool
+matchType etype = (==etype) . eventType
+
+-- | Match a numeric reply.
+matchNumeric :: [Int] -> Event a -> Bool
+matchNumeric nums ev = case _message ev of
+  Numeric num _ -> num `elem` nums
+  _ -> False
+
+-- | Match a CTCP PRIVMSG.
+matchCTCP :: [Text] -> UnicodeEvent -> Bool
+matchCTCP verbs ev = case _message ev of
+  Privmsg _ (Left ctcpbs) ->
+    let (verb, _) = first toUpper $ fromCTCP ctcpbs
+    in verb `elem` verbs
+  _ -> False
+
+-- | Lens to the matching predicate of an event handler.
 --
--- @matchType :: Lens' (EventHandler s) MatchType@
-matchType :: Functor f => (EventType -> f EventType) -> EventHandler s -> f (EventHandler s)
-matchType f h = (\mt' -> h { _matchType = mt' }) <$> f (_matchType h)
+-- @matchType :: Lens' (EventHandler s) (UnicodeEvent -> Bool)@
+eventPredicate :: Functor f => ((UnicodeEvent -> Bool) -> f (UnicodeEvent -> Bool)) -> EventHandler s -> f (EventHandler s)
+eventPredicate f h = (\mt' -> h { _eventPred = mt' }) <$> f (_eventPred h)
 
 -- | Lens to the handling function of an event handler.
 --
@@ -244,6 +273,6 @@ eventType e = case _message e of
   Invite{}  -> EInvite
   Kick{}    -> EKick
   Ping{}    -> EPing
+  Pong{}    -> EPong
   Numeric{} -> ENumeric
-
-  _ -> EEverything
+  RawMsg{}  -> ERaw

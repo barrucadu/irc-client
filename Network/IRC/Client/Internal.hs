@@ -29,6 +29,7 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
+import Data.Text                  (Text)
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
 import Data.Time.Clock            (NominalDiffTime, addUTCTime, getCurrentTime)
 import Data.Time.Format           (formatTime)
@@ -152,8 +153,8 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |Get the event handlers for an event.
-getHandlersFor :: Event a -> [EventHandler s] -> [UnicodeEvent -> StatefulIRC s ()]
-getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _matchType eh `elem` [EEverything, eventType e]]
+getHandlersFor :: Event Text -> [EventHandler s] -> [UnicodeEvent -> StatefulIRC s ()]
+getHandlersFor e ehs = [get eventFunction eh | eh <- ehs, get eventPredicate eh e]
 
 -- |A conduit which logs everything which goes through it.
 logConduit :: MonadIO m => (a -> IO ()) -> Conduit a m a

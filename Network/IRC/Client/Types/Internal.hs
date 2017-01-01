@@ -87,19 +87,10 @@ data Origin = FromServer | FromClient
 -------------------------------------------------------------------------------
 -- Events
 
--- | Types of events which can be caught.
-data EventType
-  = EEverything
-  -- ^ Match all events
-  | ENothing
-  -- ^ Match no events
-  | EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | ENumeric
-  deriving (Eq, Show)
-
 -- | A function which handles an event.
 data EventHandler s = EventHandler
-  { _matchType   :: EventType
-  -- ^ Which type to be triggered by
-  , _eventFunc   :: Event Text -> StatefulIRC s ()
+  { _eventPred :: Event Text -> Bool
+  -- ^ The predicate to match on.
+  , _eventFunc :: Event Text -> StatefulIRC s ()
   -- ^ The function to call.
   }

@@ -28,13 +28,12 @@ module Network.IRC.Client.Handlers
   ) where
 
 import Control.Applicative    ((<$>))
-import Control.Arrow          (first)
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char              (isAlphaNum)
 import Data.Maybe             (fromMaybe)
 import Data.Monoid            ((<>))
-import Data.Text              (Text, breakOn, takeEnd, toUpper)
+import Data.Text              (Text, breakOn, takeEnd)
 import Data.Time.Clock        (getCurrentTime)
 import Data.Time.Format       (formatTime)
 import Network.IRC.CTCP       (fromCTCP)
@@ -72,15 +71,15 @@ import Network.IRC.Client.Internal
 -- to process messages representing commands.
 defaultEventHandlers :: [EventHandler s]
 defaultEventHandlers =
-  [ eventHandler EPing    pingHandler
-  , eventHandler ECTCP    ctcpPingHandler
-  , eventHandler ECTCP    ctcpVersionHandler
-  , eventHandler ECTCP    ctcpTimeHandler
-  , eventHandler ENumeric welcomeNick
-  , eventHandler ENumeric joinOnWelcome
-  , eventHandler ENumeric nickMangler
-  , eventHandler ENumeric joinHandler
-  , eventHandler EKick    kickHandler
+  [ eventHandler (matchType EPing) pingHandler
+  , eventHandler (matchType EKick) kickHandler
+  , eventHandler (matchCTCP ["PING"]) ctcpPingHandler
+  , eventHandler (matchCTCP ["TIME"]) ctcpTimeHandler
+  , eventHandler (matchCTCP ["VERSION"]) ctcpVersionHandler
+  , eventHandler (matchNumeric [001]) welcomeNick
+  , eventHandler (matchNumeric [001]) joinOnWelcome
+  , eventHandler (matchNumeric [332]) joinHandler
+  , eventHandler (matchNumeric [432, 433, 436]) nickMangler
   ]
 
 -- | Respond to server @PING@ messages with a @PONG@.
@@ -91,47 +90,56 @@ pingHandler ev = case _message ev of
 
 -- | Respond to CTCP @PING@ requests with a CTCP @PONG@.
 ctcpPingHandler :: UnicodeEvent -> StatefulIRC s ()
-ctcpPingHandler = ctcpHandler [("PING", return)]
+ctcpPingHandler ev = case (_source ev, _message ev) of
+  (User n, Privmsg _ (Left ctcpbs)) ->
+    let (_, xs) = fromCTCP ctcpbs
+    in send $ ctcpReply n "PING" xs
+  _ -> pure ()
 
 -- | Respond to CTCP @VERSION@ requests with the version string.
 ctcpVersionHandler :: UnicodeEvent -> StatefulIRC s ()
-ctcpVersionHandler = ctcpHandler [("VERSION", go)] where
-  go _ = do
+ctcpVersionHandler ev = case _source ev of
+  User n -> do
     ver <- get version <$> (snapshot instanceConfig =<< getIrcState)
-    return [ver]
+    send $ ctcpReply n "VERSION" [ver]
+  _ -> pure ()
 
 -- | Respond to CTCP @TIME@ requests with the system time.
 ctcpTimeHandler :: UnicodeEvent -> StatefulIRC s ()
-ctcpTimeHandler = ctcpHandler [("TIME", go)] where
-  go _ = do
+ctcpTimeHandler ev = case _source ev of
+  User n -> do
     now <- liftIO getCurrentTime
-    return [T.pack $ formatTime defaultTimeLocale "%c" now]
+    send $ ctcpReply n "TIME" [T.pack $ formatTime defaultTimeLocale "%c" now]
+  _ -> pure ()
 
 -- | Update the nick upon welcome (numeric reply 001), as it may not
 -- be what we requested (eg, in the case of a nick too long).
 welcomeNick :: UnicodeEvent -> StatefulIRC s ()
-welcomeNick = numHandler [(001, go)] where
-  go (srvNick:_) = do
-    tvarI <- get instanceConfig <$> getIrcState
-    liftIO . atomically $
-      modifyTVar tvarI (set nick srvNick)
-  go _ = return ()
+welcomeNick ev = case _message ev of
+    Numeric _ xs ->  go xs
+    _ -> pure ()
+  where
+    go (srvNick:_) = do
+      tvarI <- get instanceConfig <$> getIrcState
+      liftIO . atomically $
+        modifyTVar tvarI (set nick srvNick)
+    go _ = pure ()
 
 -- | Join default channels upon welcome (numeric reply 001). If sent earlier,
 -- the server might reject the JOIN attempts.
 joinOnWelcome :: UnicodeEvent -> StatefulIRC s ()
-joinOnWelcome = numHandler [(001, go)] where
-  go _ = do
-    iconf <- snapshot instanceConfig =<< getIrcState
-    mapM_ (send . Join) $ get channels iconf
+joinOnWelcome _ = do
+  iconf <- snapshot instanceConfig =<< getIrcState
+  mapM_ (send . Join) $ get channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
 nickMangler :: UnicodeEvent -> StatefulIRC s ()
-nickMangler = numHandler [ (432, go fresh)
-                         , (433, go mangle)
-                         , (436, go mangle)
-                         ]
+nickMangler ev = case _message ev of
+    Numeric 432 xs -> go fresh xs
+    Numeric 433 xs -> go mangle xs
+    Numeric 436 xs -> go mangle xs
+    _ -> pure ()
   where
     go f (_:srvNick:_) = do
       theNick <- get nick <$> (snapshot instanceConfig =<< getIrcState)
@@ -183,16 +191,19 @@ nickMangler = numHandler [ (432, go fresh)
 -- | Upon receiving a channel topic (numeric reply 332), add the
 -- channel to the list (if not already present).
 joinHandler :: UnicodeEvent -> StatefulIRC s ()
-joinHandler = numHandler [(332, go)] where
-  go (c:_) = do
-    tvarI <- get instanceConfig <$> getIrcState
-    liftIO . atomically $
-      modifyTVar tvarI $ \iconf ->
-        (if c `elem` get channels iconf
-          then modify channels (c:)
-          else id) iconf
+joinHandler ev = case _message ev of
+    Numeric _ xs -> go xs
+    _ -> pure ()
+  where
+    go (c:_) = do
+      tvarI <- get instanceConfig <$> getIrcState
+      liftIO . atomically $
+        modifyTVar tvarI $ \iconf ->
+          (if c `elem` get channels iconf
+            then modify channels (c:)
+            else id) iconf
 
-  go _ = return ()
+    go _ = pure ()
 
 -- | Update the channel list upon being kicked.
 kickHandler :: UnicodeEvent -> StatefulIRC s ()
@@ -219,24 +230,6 @@ defaultOnDisconnect :: StatefulIRC s ()
 defaultOnDisconnect = return ()
 
 -- *Utils
-
--- | Match and handle a named CTCP
-ctcpHandler :: [(Text, [Text] -> StatefulIRC s [Text])] -> UnicodeEvent -> StatefulIRC s ()
-ctcpHandler hs ev = case (_source ev, _message ev) of
-  (User n, Privmsg _ (Left ctcpbs)) ->
-    let (verb, xs) = first toUpper $ fromCTCP ctcpbs
-    in case lookup verb hs of
-         Just f -> do
-           args <- f xs
-           send $ ctcpReply n verb args
-         _ -> return ()
-  _ -> return ()
-
--- | Match and handle a numeric reply
-numHandler :: [(Int, [Text] -> StatefulIRC s ())] -> UnicodeEvent -> StatefulIRC s ()
-numHandler hs ev = case _message ev of
-  Numeric num xs -> maybe (return ()) ($xs) $ lookup num hs
-  _ -> return ()
 
 -- | Break some text on the first occurrence of a substring, removing
 -- the substring from the second portion.
