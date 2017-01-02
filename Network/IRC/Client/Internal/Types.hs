@@ -4,7 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- |
--- Module      : Network.IRC.Client.Types.Internal
+-- Module      : Network.IRC.Client.Internal.Types
 -- Copyright   : (c) 2017 Michael Walker
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
@@ -15,9 +15,10 @@
 --
 -- This module is NOT considered to form part of the public interface
 -- of this library.
-module Network.IRC.Client.Types.Internal where
+module Network.IRC.Client.Internal.Types where
 
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
+import Control.Exception      (Exception)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader   (MonadReader, ReaderT, ask)
 import Control.Monad.State    (MonadState(..))
@@ -30,7 +31,7 @@ import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage)
 
 
 -------------------------------------------------------------------------------
--- The IRC monad
+-- * The IRC monad
 
 -- | The IRC monad.
 newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
@@ -46,7 +47,7 @@ instance MonadState s (IRC s) where
 
 
 -------------------------------------------------------------------------------
--- State
+-- * State
 
 -- | The state of an IRC session.
 data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
@@ -120,7 +121,12 @@ data Origin = FromServer | FromClient
 
 
 -------------------------------------------------------------------------------
--- Events
+-- * Events
+
+-- | Types of events which can be caught.
+data EventType
+  = EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | EPong | ENumeric | ERaw
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 -- | A function which handles an event.
 data EventHandler s = EventHandler
@@ -130,8 +136,20 @@ data EventHandler s = EventHandler
   -- ^ The function to call.
   }
 
+
 -------------------------------------------------------------------------------
--- * Internal Lens synonyms
+-- * Exceptions
+
+-- | Exception thrown to kill the client if the timeout elapses with
+-- nothing received from the server.
+data Timeout = Timeout
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+instance Exception Timeout
+
+
+-------------------------------------------------------------------------------
+-- * Internal lens synonyms
 
 -- | See @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Lens.html#t:Lens Control.Lens.Lens.Lens>@.
 type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t

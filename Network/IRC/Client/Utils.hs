@@ -41,11 +41,12 @@ import Control.Concurrent.STM (TVar, STM, atomically, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Text              (Text)
 import qualified Data.Text as T
+import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
 import Network.IRC.CTCP       (toCTCP)
 
-import Network.IRC.Client.Internal (send)
-import Network.IRC.Client.Types
-import Network.IRC.Client.Utils.Lens
+import Network.IRC.Client.Internal       (getConnectionState, getIrcState, send)
+import Network.IRC.Client.Internal.Types (ConnectionState(..), EventHandler, InstanceConfig, IRC)
+import Network.IRC.Client.Lens
 
 -------------------------------------------------------------------------------
 -- Nicks

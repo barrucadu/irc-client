@@ -70,11 +70,9 @@ library
   exposed-modules:     Network.IRC.Client
                      , Network.IRC.Client.Events
                      , Network.IRC.Client.Internal
+                     , Network.IRC.Client.Internal.Types
                      , Network.IRC.Client.Lens
-                     , Network.IRC.Client.Types
-                     , Network.IRC.Client.Types.Internal
                      , Network.IRC.Client.Utils
-                     , Network.IRC.Client.Utils.Lens
   
   -- Modules included in this library but not exported.
   -- other-modules:       

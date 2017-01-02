@@ -47,9 +47,20 @@ module Network.IRC.Client
   -- * Events
   , module Network.IRC.Client.Events
 
-  -- * Types
-  , module Network.IRC.Client.Types
+  -- * Lenses
+  , module Network.IRC.Client.Lens
+
+  -- * The IRC monad
+  , IRC(..)
+  , IRCState
+  , newIRCState
+  , getIrcState
+  , ConnectionState(..)
+  , getConnectionState
+  , ConnectionConfig
+  , InstanceConfig
   , defaultIRCConf
+  , Timeout(..)
 
   -- * Utilities
   , module Network.IRC.Client.Utils
@@ -57,6 +68,7 @@ module Network.IRC.Client
   , C.toByteString
   ) where
 
+import Control.Concurrent.STM     (atomically, newTVar)
 import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
@@ -74,8 +86,8 @@ import qualified Network.TLS as TLS
 
 import Network.IRC.Client.Events
 import Network.IRC.Client.Internal
-import Network.IRC.Client.Types
-import Network.IRC.Client.Types.Internal (InstanceConfig(..))
+import Network.IRC.Client.Internal.Types
+import Network.IRC.Client.Lens
 import Network.IRC.Client.Utils
 
 import qualified Paths_irc_client as Paths
@@ -225,3 +237,20 @@ defaultIRCConf n = InstanceConfig
   , _handlers = defaultEventHandlers
   , _ignore   = []
   }
+
+-------------------------------------------------------------------------------
+-- State
+
+-- | Construct a new IRC state
+newIRCState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IRCState s)
+newIRCState cconf iconf ustate = do
+  ustvar <- liftIO . atomically . newTVar $ ustate
+  ictvar <- liftIO . atomically . newTVar $ iconf
+  cstvar <- liftIO . atomically . newTVar $ Disconnected
+
+  pure IRCState
+    { _connectionConfig = cconf
+    , _userState        = ustvar
+    , _instanceConfig   = ictvar
+    , _connectionState  = cstvar
+    }

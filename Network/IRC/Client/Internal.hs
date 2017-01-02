@@ -21,11 +21,11 @@ module Network.IRC.Client.Internal where
 
 import Control.Applicative    ((<$>))
 import Control.Concurrent     (forkIO, killThread, myThreadId, threadDelay, throwTo)
-import Control.Concurrent.STM (atomically, readTVar, writeTVar)
+import Control.Concurrent.STM (STM, atomically, readTVar, writeTVar)
 import Control.Exception      (SomeException, catch, throwIO)
 import Control.Monad          (unless, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader   (runReaderT)
+import Control.Monad.Reader   (ask, runReaderT)
 import Data.ByteString        (ByteString)
 import Data.Conduit           (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan    (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
@@ -34,7 +34,7 @@ import Data.Text              (Text)
 import Data.Text.Encoding     (decodeUtf8, encodeUtf8)
 import Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format       (formatTime)
-import Network.IRC.Conduit    (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
+import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage, Message(..), Source(..), floodProtector, rawMessage, toByteString)
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
@@ -42,9 +42,8 @@ import Data.Time.Format (defaultTimeLocale)
 import System.Locale    (defaultTimeLocale)
 #endif
 
-import Network.IRC.Client.Types
-import Network.IRC.Client.Types.Internal
-import Network.IRC.Client.Utils.Lens
+import Network.IRC.Client.Internal.Types
+import Network.IRC.Client.Lens
 
 
 -------------------------------------------------------------------------------
@@ -275,6 +274,14 @@ disconnectNow = do
 
 -------------------------------------------------------------------------------
 -- * Utils
+
+-- | Access the client state.
+getIrcState :: IRC s (IRCState s)
+getIrcState = ask
+
+-- | Get the connection state from an IRC state.
+getConnectionState :: IRCState s -> STM ConnectionState
+getConnectionState = readTVar . _connectionState
 
 -- | Block until an action is successful or a timeout is reached.
 timeoutBlock :: MonadIO m => NominalDiffTime -> IO Bool -> m ()

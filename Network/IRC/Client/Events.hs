@@ -41,8 +41,8 @@ module Network.IRC.Client.Events
 
   -- * Re-exported
   , Event(..)
-  , Source(..)
   , Message(..)
+  , Source(..)
   ) where
 
 import Control.Applicative    ((<$>))
@@ -55,6 +55,7 @@ import Data.Monoid            ((<>))
 import Data.Text              (Text, breakOn, takeEnd, toUpper)
 import Data.Time.Clock        (getCurrentTime)
 import Data.Time.Format       (formatTime)
+import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
 import Network.IRC.CTCP       (fromCTCP)
 
 #if MIN_VERSION_time(1,5,0)
@@ -65,10 +66,10 @@ import System.Locale    (defaultTimeLocale)
 
 import qualified Data.Text as T
 
-import Network.IRC.Client.Types
-import Network.IRC.Client.Types.Internal (EventHandler(..))
-import Network.IRC.Client.Utils
 import Network.IRC.Client.Internal
+import Network.IRC.Client.Internal.Types
+import Network.IRC.Client.Lens
+import Network.IRC.Client.Utils
 
 -------------------------------------------------------------------------------
 -- Events
