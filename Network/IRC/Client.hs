@@ -63,7 +63,9 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import qualified Data.Conduit.Network.TLS as TLS
 import Data.Text                  (Text)
+import qualified Data.Text as T
 import Data.Time.Clock            (NominalDiffTime)
+import Data.Version (showVersion)
 import qualified Data.X509 as X
 import qualified Data.X509.CertificateStore as X
 import qualified Data.X509.Validation as X
@@ -76,6 +78,8 @@ import Network.IRC.Client.Internal
 import Network.IRC.Client.Types
 import Network.IRC.Client.Types.Internal (InstanceConfig(..))
 import Network.IRC.Client.Utils
+
+import qualified Paths_irc_client as Paths
 
 -- * Connecting to an IRC network
 
@@ -223,7 +227,7 @@ defaultIRCConf :: Text -> InstanceConfig s
 defaultIRCConf n = InstanceConfig
   { _nick     = n
   , _channels = []
-  , _version  = "irc-client-0.4.4"
+  , _version  = T.append "irc-client-" (T.pack $ showVersion Paths.version)
   , _handlers = defaultEventHandlers
   , _ignore   = []
   }
