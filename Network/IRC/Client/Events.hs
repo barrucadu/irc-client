@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- |
 -- Module      : Network.IRC.Client.Events
@@ -12,12 +13,8 @@
 -- | Events and event handlers. Handlers are invoked concurrently when
 -- matching events are received from the server.
 module Network.IRC.Client.Events
-  ( -- * Events
-    EventType(..)
-  , eventType
-
-  -- ** Event matching
-  , matchCTCP
+  ( -- * Event matching
+    matchCTCP
   , matchNumeric
   , matchType
 
@@ -57,6 +54,8 @@ import Data.Time.Clock        (getCurrentTime)
 import Data.Time.Format       (formatTime)
 import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
 import Network.IRC.CTCP       (fromCTCP)
+import Network.IRC.Conduit.Lens
+
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
@@ -73,27 +72,6 @@ import Network.IRC.Client.Utils
 -------------------------------------------------------------------------------
 -- Events
 
--- | Get the type of an event.
-eventType :: Event a -> EventType
-eventType e = case _message e of
-  (Privmsg _ Right{}) -> EPrivmsg
-  (Privmsg _ Left{})  -> ECTCP
-  (Notice  _ Right{}) -> ENotice
-  (Notice  _ Left{})  -> ECTCP
-
-  Nick{}    -> ENick
-  Join{}    -> EJoin
-  Part{}    -> EPart
-  Quit{}    -> EQuit
-  Mode{}    -> EMode
-  Topic{}   -> ETopic
-  Invite{}  -> EInvite
-  Kick{}    -> EKick
-  Ping{}    -> EPing
-  Pong{}    -> EPong
-  Numeric{} -> ENumeric
-  RawMsg{}  -> ERaw
-
 -- | Match a CTCP PRIVMSG.
 matchCTCP :: [Text] -> Event Text -> Bool
 matchCTCP verbs ev = case _message ev of
@@ -108,9 +86,10 @@ matchNumeric nums ev = case _message ev of
   Numeric num _ -> num `elem` nums
   _ -> False
 
--- | A simple predicate to match events of the given type.
-matchType :: EventType -> Event a -> Bool
-matchType etype = (==etype) . eventType
+-- | A simple predicate to match events of the given type. Refer to
+-- "Network.IRC.Conduit.Lens#Message" for the list of 'Prism''s.
+matchType :: Prism' (Message a) b -> Event a -> Bool
+matchType k = is k . _message
 
 
 -------------------------------------------------------------------------------
@@ -148,8 +127,8 @@ eventHandler = EventHandler
 -- to process messages representing commands.
 defaultEventHandlers :: [EventHandler s]
 defaultEventHandlers =
-  [ eventHandler (matchType EPing) pingHandler
-  , eventHandler (matchType EKick) kickHandler
+  [ eventHandler (matchType _Ping) pingHandler
+  , eventHandler (matchType _Kick) kickHandler
   , eventHandler (matchCTCP ["PING"]) ctcpPingHandler
   , eventHandler (matchCTCP ["TIME"]) ctcpTimeHandler
   , eventHandler (matchCTCP ["VERSION"]) ctcpVersionHandler

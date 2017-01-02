@@ -13,6 +13,7 @@
 module Network.IRC.Client.Internal.Lens where
 
 import Control.Applicative (Const(..))
+import Control.Arrow (Kleisli(..))
 import Control.Concurrent.STM (TVar, STM, atomically, readTVar, writeTVar)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Functor.Contravariant (Contravariant)
@@ -40,6 +41,13 @@ type Prism s t a b = forall p f. (Choice p, Applicative f) => p a (f b) -> p s (
 
 -- | A @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Type.html#t:Simple Simple>@ 'Prism'.
 type Prism' s a = Prism s s a a
+
+-- | A more direct implementation of
+-- @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Extras.html#v:is Control.Lens.Extras.is>@.
+{-# INLINE is #-}
+is :: Prism s t a b -> s -> Bool
+is k = either (const True) (const False . runIdentity)
+    . runKleisli (k (Kleisli Left))
 
 
 -------------------------------------------------------------------------------

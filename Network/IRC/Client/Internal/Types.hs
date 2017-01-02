@@ -123,11 +123,6 @@ data Origin = FromServer | FromClient
 -------------------------------------------------------------------------------
 -- * Events
 
--- | Types of events which can be caught.
-data EventType
-  = EPrivmsg | ENotice | ECTCP | ENick | EJoin | EPart | EQuit | EMode | ETopic | EInvite | EKick | EPing | EPong | ENumeric | ERaw
-  deriving (Bounded, Enum, Eq, Ord, Read, Show)
-
 -- | A function which handles an event.
 data EventHandler s = EventHandler
   { _eventPred :: Event Text -> Bool

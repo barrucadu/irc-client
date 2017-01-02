@@ -90,7 +90,7 @@ library
                      , conduit             >=1.2   && <1.3
                      , connection          >=0.2   && <0.3
                      , contravariant       >=0.1   && <1.5
-                     , irc-conduit         >=0.2.1 && <0.3
+                     , irc-conduit         >=0.2.2 && <0.3
                      , irc-ctcp            >=0.1.2 && <0.2
                      , mtl                 >=2.1   && <2.3
                      , network-conduit-tls >=1.1   && <1.3
