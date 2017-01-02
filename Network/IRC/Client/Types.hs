@@ -11,8 +11,7 @@
 -- <http://hackage.haskell.org/package/irc-ctcp/docs/Network-IRC-CTCP.html Network.IRC.CTCP>.
 module Network.IRC.Client.Types
   ( -- * The IRC monad
-    IRC
-  , StatefulIRC(..)
+    IRC(..)
   , getIrcState
 
   -- * State
@@ -64,12 +63,6 @@ import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
 import Network.IRC.Client.Types.Internal
 
 -------------------------------------------------------------------------------
--- The IRC monad
-
--- | The IRC monad.
-type IRC a = StatefulIRC () a
-
--------------------------------------------------------------------------------
 -- State
 
 -- | Construct a new IRC state
@@ -91,7 +84,7 @@ newIRCState cconf iconf ustate = do
 -- State Getters
 
 -- | Access the client state.
-getIrcState :: StatefulIRC s (IRCState s)
+getIrcState :: IRC s (IRCState s)
 getIrcState = ask
 
 -- | Get the connection state from an IRC state.
@@ -147,8 +140,8 @@ timeout f cc = (\t' -> cc { _timeout = t' }) <$> f (_timeout cc)
 -- run after sending the `PASS` and `USER` commands to the server. The
 -- default behaviour is to send the `NICK` command.
 --
--- @onconnect :: Lens' (ConnectionConfig s) (StatefulIRC s ())@
-onconnect :: Functor f => (StatefulIRC s () -> f (StatefulIRC s ())) -> ConnectionConfig s -> f (ConnectionConfig s)
+-- @onconnect :: Lens' (ConnectionConfig s) (IRC s ())@
+onconnect :: Functor f => (IRC s () -> f (IRC s ())) -> ConnectionConfig s -> f (ConnectionConfig s)
 onconnect f cc = (\oc' -> cc { _onconnect = oc' }) <$> f (_onconnect cc)
 
 -- | Lens to the action to run after disconnecting from the server,
@@ -156,8 +149,8 @@ onconnect f cc = (\oc' -> cc { _onconnect = oc' }) <$> f (_onconnect cc)
 -- after tearing down the connection. The default behaviour is to do
 -- nothing.
 --
--- @ondisconnect :: Lens' (ConnectionConfig s) (StatefulIRC s ())@
-ondisconnect :: Functor f => (StatefulIRC s () -> f (StatefulIRC s ())) -> ConnectionConfig s -> f (ConnectionConfig s)
+-- @ondisconnect :: Lens' (ConnectionConfig s) (IRC s ())@
+ondisconnect :: Functor f => (IRC s () -> f (IRC s ())) -> ConnectionConfig s -> f (ConnectionConfig s)
 ondisconnect f cc = (\od' -> cc { _ondisconnect = od' }) <$> f (_ondisconnect cc)
 
 -- | Lens to the nick from the instance config.

@@ -53,7 +53,7 @@ import Network.IRC.Client.Utils.Lens
 -- | Update the nick in the instance configuration and also send an
 -- update message to the server. This doesn't attempt to resolve nick
 -- collisions, that's up to the event handlers.
-setNick :: Text -> StatefulIRC s ()
+setNick :: Text -> IRC s ()
 setNick new = do
   tvarI <- get instanceConfig <$> getIrcState
   liftIO . atomically $
@@ -66,7 +66,7 @@ setNick new = do
 
 -- | Update the channel list in the instance configuration and also
 -- part the channel.
-leaveChannel :: Text -> Maybe Text -> StatefulIRC s ()
+leaveChannel :: Text -> Maybe Text -> IRC s ()
 leaveChannel chan reason = do
   tvarI <- get instanceConfig <$> getIrcState
   liftIO . atomically $ delChan tvarI chan
@@ -84,14 +84,14 @@ delChan tvarI chan =
 -- Events
 
 -- | Add an event handler
-addHandler :: EventHandler s -> StatefulIRC s ()
+addHandler :: EventHandler s -> IRC s ()
 addHandler handler = do
   tvarI <- get instanceConfig <$> getIrcState
   liftIO . atomically $
     modifyTVar tvarI (modify handlers (handler:))
 
 -- | Send a message to the source of an event.
-reply :: Event Text -> Text -> StatefulIRC s ()
+reply :: Event Text -> Text -> IRC s ()
 reply ev txt = case _source ev of
   Channel c _ -> mapM_ (send . Privmsg c . Right) $ T.lines txt
   User n      -> mapM_ (send . Privmsg n . Right) $ T.lines txt
@@ -114,17 +114,17 @@ ctcpReply t command args = Notice t . Left $ toCTCP command args
 -- Connection state
 
 -- | Check if the client is connected.
-isConnected :: StatefulIRC s Bool
+isConnected :: IRC s Bool
 isConnected = (==Connected) <$> snapConnState
 
 -- | Check if the client is in the process of disconnecting.
-isDisconnecting :: StatefulIRC s Bool
+isDisconnecting :: IRC s Bool
 isDisconnecting = (==Disconnecting) <$> snapConnState
 
 -- | Check if the client is disconnected
-isDisconnected :: StatefulIRC s Bool
+isDisconnected :: IRC s Bool
 isDisconnected = (==Disconnected) <$> snapConnState
 
 -- | Snapshot the connection state.
-snapConnState :: StatefulIRC s ConnectionState
+snapConnState :: IRC s ConnectionState
 snapConnState = liftIO . atomically . getConnectionState =<< getIrcState

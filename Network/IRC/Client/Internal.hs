@@ -54,9 +54,9 @@ import Network.IRC.Client.Utils.Lens
 connectInternal :: MonadIO m
   => (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
   -- ^ Function to start the network conduits.
-  -> StatefulIRC s ()
+  -> IRC s ()
   -- ^ Connect handler
-  -> StatefulIRC s ()
+  -> IRC s ()
   -- ^ Disconnect handler
   -> (Origin -> ByteString -> IO ())
   -- ^ Logging function
@@ -90,7 +90,7 @@ connectInternal f oncon ondis logf host port flood = liftIO $ do
 -- * Event loop
 
 -- | The event loop.
-runner :: StatefulIRC s ()
+runner :: IRC s ()
 runner = do
   state <- getIrcState
   let cconf = _connectionConfig state
@@ -101,7 +101,7 @@ runner = do
   let thePass = get password cconf
 
   -- Initialise the IRC session
-  let initialise = flip runReaderT state . runStatefulIRC $ do
+  let initialise = flip runReaderT state . runIRC $ do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
@@ -163,7 +163,7 @@ eventSink lastReceived ircstate = go where
     ignored <- isIgnored ircstate event'
     unless ignored $ do
       hs <- getHandlersFor event' . get handlers <$> snapshot instanceConfig ircstate
-      liftIO $ mapM_ (\h -> forkIO $ runReaderT (runStatefulIRC $ h event') ircstate) hs
+      liftIO $ mapM_ (\h -> forkIO $ runReaderT (runIRC $ h event') ircstate) hs
 
     -- If disconnected, do not loop.
     disconnected <- liftIO . atomically $ (==Disconnected) <$> getConnectionState ircstate
@@ -182,7 +182,7 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |Get the event handlers for an event.
-getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> StatefulIRC s ()]
+getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> IRC s ()]
 getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _eventPred eh e]
 
 -- |A conduit which logs everything which goes through it.
@@ -227,12 +227,12 @@ noopLogger _ _ = return ()
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
-send :: Message Text -> StatefulIRC s ()
+send :: Message Text -> IRC s ()
 send = sendBS . fmap encodeUtf8
 
 -- | Send a message, using TLS if enabled. This blocks if messages are
 -- sent too rapidly.
-sendBS :: IrcMessage -> StatefulIRC s ()
+sendBS :: IrcMessage -> IRC s ()
 sendBS msg = do
   queue <- _sendqueue . _connectionConfig <$> getIrcState
   liftIO . atomically $ writeTBMChan queue msg
@@ -243,7 +243,7 @@ sendBS msg = do
 
 -- | Disconnect from the server, properly tearing down the TLS session
 -- (if there is one).
-disconnect :: StatefulIRC s ()
+disconnect :: IRC s ()
 disconnect = do
   s <- getIrcState
 
@@ -264,7 +264,7 @@ disconnect = do
     _ -> pure ()
 
 -- | Disconnect immediately, without waiting for messages to be sent.
-disconnectNow :: StatefulIRC s ()
+disconnectNow :: IRC s ()
 disconnectNow = do
   s <- getIrcState
   liftIO . atomically $ do

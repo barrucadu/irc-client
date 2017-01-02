@@ -28,7 +28,6 @@ module Network.IRC.Client
   , connectWithTLSVerify
   , start
   , start'
-  , startStateful
 
   -- * Logging
   , Origin (..)
@@ -207,18 +206,13 @@ connectWithTLSVerify' lg verifier host port =
 -- * Starting
 
 -- | Run the event loop for a server, receiving messages and handing
--- them off to handlers as appropriate. Messages will be logged to
--- stdout.
-start :: MonadIO m => ConnectionConfig () -> InstanceConfig () -> m ()
-start cconf iconf = startStateful cconf iconf ()
+-- them off to handlers as appropriate.
+start :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m ()
+start cconf iconf ustate = newIRCState cconf iconf ustate >>= start'
 
--- | like 'start' but for clients with state.
-startStateful :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m ()
-startStateful cconf iconf ustate = newIRCState cconf iconf ustate >>= start'
-
--- | Like 'start', but use the provided initial state.
+-- | Like 'start', but use the provided initial 'IRCState'.
 start' :: MonadIO m => IRCState s -> m ()
-start' = liftIO . runReaderT (runStatefulIRC runner)
+start' = liftIO . runReaderT (runIRC runner)
 
 -- * Default configuration
 

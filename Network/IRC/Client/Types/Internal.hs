@@ -30,13 +30,13 @@ import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage)
 
 
 -------------------------------------------------------------------------------
--- The (stateful) IRC monad
+-- The IRC monad
 
--- | The IRC monad, with state.
-newtype StatefulIRC s a = StatefulIRC { runStatefulIRC :: ReaderT (IRCState s) IO a }
+-- | The IRC monad.
+newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IRCState s))
 
-instance MonadState s (StatefulIRC s) where
+instance MonadState s (IRC s) where
   state f = do
     tvar <- _userState <$> ask
     liftIO . atomically $ do
@@ -80,10 +80,10 @@ data ConnectionConfig s = ConnectionConfig
   , _timeout    :: NominalDiffTime
   -- ^ The maximum time between received messages from the server
   -- before disconnect.
-  , _onconnect  :: StatefulIRC s ()
+  , _onconnect  :: IRC s ()
   -- ^ Action to run after successfully connecting to the server and
   -- setting the nick.
-  , _ondisconnect :: StatefulIRC s ()
+  , _ondisconnect :: IRC s ()
   -- ^ Action to run if the remote server closes the connection.
   , _logfunc    :: Origin -> ByteString -> IO ()
   -- ^ Function to log messages sent to and received from the server.
@@ -120,6 +120,6 @@ data Origin = FromServer | FromClient
 data EventHandler s = EventHandler
   { _eventPred :: Event Text -> Bool
   -- ^ The predicate to match on.
-  , _eventFunc :: Event Text -> StatefulIRC s ()
+  , _eventFunc :: Event Text -> IRC s ()
   -- ^ The function to call.
   }
