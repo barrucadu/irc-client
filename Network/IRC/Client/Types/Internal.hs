@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 
 -- |
@@ -6,7 +9,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : RankNTypes
+-- Portability : FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RankNTypes
 --
 -- Internal types. Most of these are re-exported elsewhere as lenses.
 --
@@ -14,21 +17,32 @@
 -- of this library.
 module Network.IRC.Client.Types.Internal where
 
-import Control.Concurrent.STM     (TVar)
-import Control.Monad.Trans.Reader (ReaderT)
-import Data.ByteString            (ByteString)
-import Data.Conduit               (Consumer, Producer)
-import Data.Conduit.TMChan        (TBMChan)
-import Data.Text                  (Text)
-import Data.Time.Clock            (NominalDiffTime)
-import Network.IRC.Conduit        (Event(..), IrcEvent, IrcMessage)
+import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader   (MonadReader, ReaderT, ask)
+import Control.Monad.State    (MonadState(..))
+import Data.ByteString        (ByteString)
+import Data.Conduit           (Consumer, Producer)
+import Data.Conduit.TMChan    (TBMChan)
+import Data.Text              (Text)
+import Data.Time.Clock        (NominalDiffTime)
+import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage)
 
 
 -------------------------------------------------------------------------------
 -- The (stateful) IRC monad
 
 -- | The IRC monad, with state.
-type StatefulIRC s a = ReaderT (IRCState s) IO a
+newtype StatefulIRC s a = StatefulIRC { runStatefulIRC :: ReaderT (IRCState s) IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IRCState s))
+
+instance MonadState s (StatefulIRC s) where
+  state f = do
+    tvar <- _userState <$> ask
+    liftIO . atomically $ do
+      (a, s) <- f <$> readTVar tvar
+      writeTVar tvar s
+      pure a
 
 
 -------------------------------------------------------------------------------

@@ -12,7 +12,7 @@
 module Network.IRC.Client.Types
   ( -- * The IRC monad
     IRC
-  , StatefulIRC
+  , StatefulIRC(..)
   , getIrcState
 
   -- * State
@@ -52,14 +52,14 @@ module Network.IRC.Client.Types
   , Source(..)
   ) where
 
-import Control.Applicative        ((<$>))
-import Control.Concurrent.STM     (STM, TVar, atomically, readTVar, newTVar)
-import Control.Exception          (Exception)
-import Control.Monad.IO.Class     (MonadIO, liftIO)
-import Control.Monad.Trans.Reader (ask)
-import Data.Text                  (Text)
-import Data.Time.Clock            (NominalDiffTime)
-import Network.IRC.Conduit        (Event(..), Message(..), Source(..))
+import Control.Applicative    ((<$>))
+import Control.Concurrent.STM (STM, TVar, atomically, readTVar, newTVar)
+import Control.Exception      (Exception)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader   (ask)
+import Data.Text              (Text)
+import Data.Time.Clock        (NominalDiffTime)
+import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
 
 import Network.IRC.Client.Types.Internal
 

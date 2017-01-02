@@ -218,7 +218,7 @@ startStateful cconf iconf ustate = newIRCState cconf iconf ustate >>= start'
 
 -- | Like 'start', but use the provided initial state.
 start' :: MonadIO m => IRCState s -> m ()
-start' = liftIO . runReaderT runner
+start' = liftIO . runReaderT (runStatefulIRC runner)
 
 -- * Default configuration
 

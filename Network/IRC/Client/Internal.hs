@@ -19,22 +19,22 @@
 -- of this library.
 module Network.IRC.Client.Internal where
 
-import Control.Applicative        ((<$>))
-import Control.Concurrent         (forkIO, killThread, myThreadId, threadDelay, throwTo)
-import Control.Concurrent.STM     (atomically, readTVar, writeTVar)
-import Control.Exception          (SomeException, catch, throwIO)
-import Control.Monad              (unless, when)
-import Control.Monad.IO.Class     (MonadIO, liftIO)
-import Control.Monad.Trans.Reader (runReaderT)
-import Data.ByteString            (ByteString)
-import Data.Conduit               (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
-import Data.Conduit.TMChan        (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
-import Data.IORef                 (IORef, newIORef, readIORef, writeIORef)
-import Data.Text                  (Text)
-import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
-import Data.Time.Clock            (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
-import Data.Time.Format           (formatTime)
-import Network.IRC.Conduit        (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
+import Control.Applicative    ((<$>))
+import Control.Concurrent     (forkIO, killThread, myThreadId, threadDelay, throwTo)
+import Control.Concurrent.STM (atomically, readTVar, writeTVar)
+import Control.Exception      (SomeException, catch, throwIO)
+import Control.Monad          (unless, when)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Reader   (runReaderT)
+import Data.ByteString        (ByteString)
+import Data.Conduit           (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
+import Data.Conduit.TMChan    (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
+import Data.IORef             (IORef, newIORef, readIORef, writeIORef)
+import Data.Text              (Text)
+import Data.Text.Encoding     (decodeUtf8, encodeUtf8)
+import Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
+import Data.Time.Format       (formatTime)
+import Network.IRC.Conduit    (IrcEvent, IrcMessage, floodProtector, rawMessage, toByteString)
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
@@ -101,7 +101,7 @@ runner = do
   let thePass = get password cconf
 
   -- Initialise the IRC session
-  let initialise = flip runReaderT state $ do
+  let initialise = flip runReaderT state . runStatefulIRC $ do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
@@ -163,7 +163,7 @@ eventSink lastReceived ircstate = go where
     ignored <- isIgnored ircstate event'
     unless ignored $ do
       hs <- getHandlersFor event' . get handlers <$> snapshot instanceConfig ircstate
-      liftIO $ mapM_ (\h -> forkIO $ runReaderT (h event') ircstate) hs
+      liftIO $ mapM_ (\h -> forkIO $ runReaderT (runStatefulIRC $ h event') ircstate) hs
 
     -- If disconnected, do not loop.
     disconnected <- liftIO . atomically $ (==Disconnected) <$> getConnectionState ircstate
