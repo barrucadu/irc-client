@@ -27,6 +27,8 @@ import Network.IRC.Conduit
 
 import Network.IRC.Client.Internal.Types
 
+{-# ANN module ("HLint: ignore Redundant lambda") #-}
+
 -- CPP seem to dislike the first ' on the RHS…
 #define PRIME() '
 
