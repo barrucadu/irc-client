@@ -140,8 +140,8 @@ connect' :: MonadIO m
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> m (ConnectionConfig s)
-connect' lg host port =
-  connectInternal (C.ircClient port host) defaultOnConnect defaultOnDisconnect lg host port
+connect' lg host port_ =
+  connectInternal (C.ircClient port_ host) defaultOnConnect defaultOnDisconnect lg host port_
 
 -- | Connect to a server with TLS, with the provided logging function.
 connectWithTLS' :: MonadIO m
@@ -154,8 +154,8 @@ connectWithTLS' :: MonadIO m
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> m (ConnectionConfig s)
-connectWithTLS' lg host port =
-  connectInternal (C.ircTLSClient port host) defaultOnConnect defaultOnDisconnect lg host port
+connectWithTLS' lg host port_ =
+  connectInternal (C.ircTLSClient port_ host) defaultOnConnect defaultOnDisconnect lg host port_
 
 -- | Connect to a server with TLS using the given TLS config, with the
 -- provided logging function.
@@ -168,10 +168,10 @@ connectWithTLSConfig' :: MonadIO m
   -- ^ The flood cooldown
   -> m (ConnectionConfig s)
 connectWithTLSConfig' lg cfg =
-  connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port
+  connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port_
   where
     host = TLS.tlsClientHost cfg
-    port = TLS.tlsClientPort cfg
+    port_ = TLS.tlsClientPort cfg
 
 -- | Connect to a server with TLS using the given certificate
 -- verifier, with the provided logging function.
@@ -188,11 +188,11 @@ connectWithTLSVerify' :: MonadIO m
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> m (ConnectionConfig s)
-connectWithTLSVerify' lg verifier host port =
-  connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port
+connectWithTLSVerify' lg verifier host port_ =
+  connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port_
   where
     cfg =
-      let cfg0 = C.defaultTLSConfig port host
+      let cfg0 = C.defaultTLSConfig port_ host
           -- this is a partial pattern match, but because I'm the
           -- author of irc-conduit I can do this.
           TLS.TLSSettings cTLSSettings = TLS.tlsClientTLSSettings cfg0
