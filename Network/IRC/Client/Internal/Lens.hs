@@ -17,6 +17,7 @@ import Control.Concurrent.STM (TVar, STM, atomically, readTVar, writeTVar)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Functor.Contravariant (Contravariant)
 import Data.Functor.Identity (Identity(..))
+import Data.Profunctor (Choice)
 
 
 -------------------------------------------------------------------------------
@@ -33,6 +34,12 @@ type Getter s a = forall f. (Contravariant f, Functor f) => (a -> f a) -> s -> f
 
 -- | See @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Getter.html#t:Getting Control.Lens.Getter.Getting>@.
 type Getting r s a = (a -> Const r a) -> s -> Const r s
+
+-- | See @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Prism.html#t:Prism Control.Lens.Prism.Prism>@.
+type Prism s t a b = forall p f. (Choice p, Applicative f) => p a (f b) -> p s (f t)
+
+-- | A @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Type.html#t:Simple Simple>@ 'Prism'.
+type Prism' s a = Prism s s a a
 
 
 -------------------------------------------------------------------------------
