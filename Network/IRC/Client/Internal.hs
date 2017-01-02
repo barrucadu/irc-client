@@ -67,7 +67,7 @@ connectInternal :: MonadIO m
   -> NominalDiffTime
   -- ^ Flood timeout
   -> m (ConnectionConfig s)
-connectInternal f oncon ondis logf host port flood = liftIO $ do
+connectInternal f oncon ondis logf host port_ flood_ = liftIO $ do
   queueS <- newTBMChanIO 16
 
   return ConnectionConfig
@@ -77,8 +77,8 @@ connectInternal f oncon ondis logf host port flood = liftIO $ do
     , _realname     = "irc-client"
     , _password     = Nothing
     , _server       = host
-    , _port         = port
-    , _flood        = flood
+    , _port         = port_
+    , _flood        = flood_
     , _timeout      = 300
     , _onconnect    = oncon
     , _ondisconnect = ondis

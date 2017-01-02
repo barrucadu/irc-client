@@ -70,21 +70,24 @@ data ConnectionConfig s = ConnectionConfig
   , _port       :: Int
   -- ^ The server port.
   , _username   :: Text
-  -- ^ Client username
+  -- ^ Client username; sent to the server during the initial set-up.
   , _realname   :: Text
-  -- ^ Client realname
+  -- ^ Client realname; sent to the server during the initial set-up.
   , _password   :: Maybe Text
-  -- ^ Client password
+  -- ^ Client password; sent to the server during the initial set-up.
   , _flood      :: NominalDiffTime
   -- ^ The minimum time between two adjacent messages.
   , _timeout    :: NominalDiffTime
-  -- ^ The maximum time between received messages from the server
-  -- before disconnect.
+  -- ^ The maximum time between received messages from the server. If no
+  -- messages arrive from the server for this period, the client is sent
+  -- a 'Timeout' exception and disconnects.
   , _onconnect  :: IRC s ()
-  -- ^ Action to run after successfully connecting to the server and
-  -- setting the nick.
+  -- ^ Action to run after sending the @PASS@ and @USER@ commands to the
+  -- server. The default behaviour is to send the @NICK@ command.
   , _ondisconnect :: IRC s ()
-  -- ^ Action to run if the remote server closes the connection.
+  -- ^ Action to run after disconnecting from the server, both by local
+  -- choice and by losing the connection. This is run after tearing down the
+  -- connection. The default behaviour is to do nothing.
   , _logfunc    :: Origin -> ByteString -> IO ()
   -- ^ Function to log messages sent to and received from the server.
   }
@@ -94,14 +97,17 @@ data InstanceConfig s = InstanceConfig
   { _nick     :: Text
   -- ^ Client nick
   , _channels :: [Text]
-  -- ^ Current channels
+  -- ^ Current channels: this list both determines the channels to join on
+  -- connect, and is modified by the default event handlers when channels
+  -- are joined or parted.
   , _version  :: Text
-  -- ^ Response to CTCP VERSION
+  -- ^ The version is sent in response to the CTCP \"VERSION\" request by
+  -- the default event handlers.
   , _handlers :: [EventHandler s]
   -- ^ The registered event handlers
   , _ignore   :: [(Text, Maybe Text)]
   -- ^ List of nicks (optionally restricted to channels) to ignore
-  -- messages from. No channel = global.
+  -- messages from. 'Nothing' ignores globally.
   }
 
 -- | The state of the connection.
@@ -123,3 +129,12 @@ data EventHandler s = EventHandler
   , _eventFunc :: Event Text -> IRC s ()
   -- ^ The function to call.
   }
+
+-------------------------------------------------------------------------------
+-- * Internal Lens synonyms
+
+-- | See @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Lens.html#t:Lens Control.Lens.Lens.Lens>@.
+type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
+
+-- | A @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Type.html#t:Simple Simple>@ 'Lens'.
+type Lens' s a = Lens s s a a

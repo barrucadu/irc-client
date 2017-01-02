@@ -25,10 +25,6 @@ module Network.IRC.Client.Events
   , EventHandler
   , eventHandler
 
-  -- ** Lenses
-  , eventPredicate
-  , eventFunction
-
   -- * Default handlers
   , defaultEventHandlers
   , defaultOnConnect
@@ -128,17 +124,6 @@ eventHandler
   -- ^ Event handler.
   -> EventHandler s
 eventHandler = EventHandler
--- | Lens to the matching predicate of an event handler.
---
--- @matchType :: Lens' (EventHandler s) (Event Text -> Bool)@
-eventPredicate :: Functor f => ((Event Text -> Bool) -> f (Event Text -> Bool)) -> EventHandler s -> f (EventHandler s)
-eventPredicate f h = (\mt' -> h { _eventPred = mt' }) <$> f (_eventPred h)
-
--- | Lens to the handling function of an event handler.
---
--- @eventFunction :: Lens' (EventHandler s) (Event Text -> IRC s ())@
-eventFunction :: Functor f => ((Event Text -> IRC s ()) -> f (Event Text -> IRC s ())) -> EventHandler s -> f (EventHandler s)
-eventFunction f h = (\ef' -> h { _eventFunc = ef' }) <$> f (_eventFunc h)
 
 
 -------------------------------------------------------------------------------
