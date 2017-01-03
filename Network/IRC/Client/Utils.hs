@@ -44,8 +44,7 @@ import qualified Data.Text as T
 import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
 import Network.IRC.CTCP       (toCTCP)
 
-import Network.IRC.Client.Internal       (getConnectionState, getIrcState, send)
-import Network.IRC.Client.Internal.Types (ConnectionState(..), EventHandler, InstanceConfig, IRC)
+import Network.IRC.Client.Internal
 import Network.IRC.Client.Lens
 
 -------------------------------------------------------------------------------

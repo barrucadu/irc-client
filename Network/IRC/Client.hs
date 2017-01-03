@@ -83,7 +83,6 @@ import qualified Network.TLS as TLS
 
 import Network.IRC.Client.Events
 import Network.IRC.Client.Internal
-import Network.IRC.Client.Internal.Types
 import Network.IRC.Client.Lens
 import Network.IRC.Client.Utils
 

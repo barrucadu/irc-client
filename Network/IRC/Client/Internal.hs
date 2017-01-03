@@ -17,7 +17,11 @@
 --
 -- This module is NOT considered to form part of the public interface
 -- of this library.
-module Network.IRC.Client.Internal where
+module Network.IRC.Client.Internal
+  ( module Network.IRC.Client.Internal
+  , module Network.IRC.Client.Internal.Lens
+  , module Network.IRC.Client.Internal.Types
+  ) where
 
 import Control.Applicative    ((<$>))
 import Control.Concurrent     (forkIO, killThread, myThreadId, threadDelay, throwTo)
@@ -42,6 +46,7 @@ import Data.Time.Format (defaultTimeLocale)
 import System.Locale    (defaultTimeLocale)
 #endif
 
+import Network.IRC.Client.Internal.Lens
 import Network.IRC.Client.Internal.Types
 import Network.IRC.Client.Lens
 

@@ -1,28 +1,24 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ImpredicativeTypes #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- |
--- Module      : Network.IRC.Client.Utils.Lens
+-- Module      : Network.IRC.Client.Lens
 -- Copyright   : (c) 2017 Michael Walker
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : CPP, ImpredicativeTypes, RankNTypes
+-- Portability : CPP, ImpredicativeTypes
 --
--- Lenses and utilities for dealing with lenses without depending on
--- the lens library.
+-- Lenses.
 module Network.IRC.Client.Lens where
 
-import Control.Applicative (Const(..))
-import Control.Concurrent.STM (STM, TVar, atomically, readTVar, writeTVar)
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Concurrent.STM (TVar)
 import Data.ByteString (ByteString)
-import Data.Functor.Identity (Identity(..))
 import Data.Text (Text)
 import Data.Time (NominalDiffTime)
 import Network.IRC.Conduit
 
+import Network.IRC.Client.Internal.Lens
 import Network.IRC.Client.Internal.Types
 
 {-# ANN module ("HLint: ignore Redundant lambda") #-}
@@ -82,32 +78,3 @@ LENS((InstanceConfig s),ignore,[(Text, Maybe Text)])
 
 LENS((EventHandler s),eventPred,(Event Text -> Bool))
 LENS((EventHandler s),eventFunc,(Event Text -> IRC s ()))
-
-
--------------------------------------------------------------------------------
--- * Utilities
-
--- | Get a value from a lens.
-get :: Getting a s a -> s -> a
-get lens = getConst . lens Const
-
--- | Set a value in a lens.
-set :: Lens' s a -> a -> s -> s
-set lens a = runIdentity . lens (\_ -> Identity a)
-
--- | Modify a value in a lens.
-modify :: Lens' s a -> (a -> a) -> s -> s
-modify lens f s = let a = get lens s in set lens (f a) s
-
--- | Atomically snapshot some shared state.
-snapshot :: MonadIO m => Getting (TVar a) s (TVar a) -> s -> m a
-snapshot lens = liftIO . atomically . readTVar . get lens
-
--- | Atomically snapshot and modify some shared state.
-snapshotModify :: MonadIO m => Lens' s (TVar a) -> (a -> STM (a, b)) -> s -> m b
-snapshotModify lens f s = liftIO . atomically $ do
-  let avar = get lens s
-  a <- readTVar avar
-  (a', b) <- f a
-  writeTVar avar a'
-  pure b

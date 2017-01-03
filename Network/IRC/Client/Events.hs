@@ -67,7 +67,6 @@ import System.Locale    (defaultTimeLocale)
 import qualified Data.Text as T
 
 import Network.IRC.Client.Internal
-import Network.IRC.Client.Internal.Types
 import Network.IRC.Client.Lens
 import Network.IRC.Client.Utils
 
