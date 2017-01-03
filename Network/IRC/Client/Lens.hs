@@ -18,8 +18,6 @@ import Control.Applicative (Const(..))
 import Control.Concurrent.STM (STM, TVar, atomically, readTVar, writeTVar)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString (ByteString)
-import Data.Conduit (Consumer, Producer)
-import Data.Conduit.TMChan (TBMChan)
 import Data.Functor.Identity (Identity(..))
 import Data.Text (Text)
 import Data.Time (NominalDiffTime)
@@ -45,14 +43,12 @@ import Network.IRC.Client.Internal.Types
 LENS((IRCState s),connectionConfig,(ConnectionConfig s))
 LENS((IRCState s),userState,(TVar s))
 LENS((IRCState s),instanceConfig,(TVar (InstanceConfig s)))
-LENS((IRCState s),sendqueue,(TBMChan IrcMessage))
 LENS((IRCState s),connectionState,(TVar ConnectionState))
 
 
 -------------------------------------------------------------------------------
 -- * Lenses for 'ConnectionConfig'
 
-LENS((ConnectionConfig s),func,(IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()))
 LENS((ConnectionConfig s),server,ByteString)
 LENS((ConnectionConfig s),port,Int)
 LENS((ConnectionConfig s),username,Text)
