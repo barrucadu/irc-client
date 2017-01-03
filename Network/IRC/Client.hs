@@ -31,10 +31,6 @@ module Network.IRC.Client
 
   -- * Logging
   , Origin (..)
-  , connect'
-  , connectWithTLS'
-  , connectWithTLSConfig'
-  , connectWithTLSVerify'
   , stdoutLogger
   , fileLogger
   , noopLogger
@@ -104,7 +100,8 @@ connect
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> ConnectionConfig s
-connect = connect' noopLogger
+connect host port_ =
+  connectInternal (C.ircClient port_ host) defaultOnConnect defaultOnDisconnect noopLogger host port_
 
 -- | Connect to a server with TLS.
 connectWithTLS
@@ -115,7 +112,8 @@ connectWithTLS
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> ConnectionConfig s
-connectWithTLS = connectWithTLS' noopLogger
+connectWithTLS host port_ =
+  connectInternal (C.ircTLSClient port_ host) defaultOnConnect defaultOnDisconnect noopLogger host port_
 
 -- | Connect to a server with TLS using the given TLS config.
 connectWithTLSConfig
@@ -124,7 +122,11 @@ connectWithTLSConfig
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> ConnectionConfig s
-connectWithTLSConfig = connectWithTLSConfig' noopLogger
+connectWithTLSConfig cfg =
+    connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect noopLogger host port_
+  where
+    host  = TLS.tlsClientHost cfg
+    port_ = TLS.tlsClientPort cfg
 
 -- | Connect to a server with TLS using the given certificate
 -- verifier.
@@ -139,70 +141,8 @@ connectWithTLSVerify
   -> NominalDiffTime
   -- ^ The flood cooldown
   -> ConnectionConfig s
-connectWithTLSVerify = connectWithTLSVerify' noopLogger
-
--- | Connect to a server without TLS, with the provided logging
--- function.
-connect'
-  :: (Origin -> ByteString -> IO ())
-  -- ^ The message logger
-  -> ByteString
-  -- ^ The hostname
-  -> Int
-  -- ^ The port
-  -> NominalDiffTime
-  -- ^ The flood cooldown
-  -> ConnectionConfig s
-connect' lg host port_ =
-  connectInternal (C.ircClient port_ host) defaultOnConnect defaultOnDisconnect lg host port_
-
--- | Connect to a server with TLS, with the provided logging function.
-connectWithTLS'
-  :: Origin -> ByteString -> IO ()
-  -- ^ The message logger
-  -> ByteString
-  -- ^ The hostname
-  -> Int
-  -- ^ The port
-  -> NominalDiffTime
-  -- ^ The flood cooldown
-  -> ConnectionConfig s
-connectWithTLS' lg host port_ =
-  connectInternal (C.ircTLSClient port_ host) defaultOnConnect defaultOnDisconnect lg host port_
-
--- | Connect to a server with TLS using the given TLS config, with the
--- provided logging function.
-connectWithTLSConfig'
-  :: (Origin -> ByteString -> IO ())
-  -- ^ The message logger
-  -> TLS.TLSClientConfig
-  -- ^ The TLS config
-  -> NominalDiffTime
-  -- ^ The flood cooldown
-  -> ConnectionConfig s
-connectWithTLSConfig' lg cfg =
-  connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port_
-  where
-    host = TLS.tlsClientHost cfg
-    port_ = TLS.tlsClientPort cfg
-
--- | Connect to a server with TLS using the given certificate
--- verifier, with the provided logging function.
-connectWithTLSVerify'
-  :: (Origin -> ByteString -> IO ())
-  -- ^ The message logger
-  -> (X.CertificateStore -> TLS.ValidationCache -> X.ServiceID -> X.CertificateChain -> IO [X.FailedReason])
-  -- ^ The certificate verifier. Returns an empty list if the cert is
-  -- good.
-  -> ByteString
-  -- ^ The hostname
-  -> Int
-  -- ^ The port
-  -> NominalDiffTime
-  -- ^ The flood cooldown
-  -> ConnectionConfig s
-connectWithTLSVerify' lg verifier host port_ =
-  connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port_
+connectWithTLSVerify verifier host port_ =
+    connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect noopLogger host port_
   where
     cfg =
       let cfg0 = C.defaultTLSConfig port_ host
