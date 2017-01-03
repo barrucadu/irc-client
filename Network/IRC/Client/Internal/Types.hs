@@ -20,7 +20,7 @@ module Network.IRC.Client.Internal.Types where
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
 import Control.Exception      (Exception)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader   (MonadReader, ReaderT, ask)
+import Control.Monad.Reader   (MonadReader, ReaderT, asks)
 import Control.Monad.State    (MonadState(..))
 import Data.ByteString        (ByteString)
 import Data.Conduit           (Consumer, Producer)
@@ -39,12 +39,17 @@ newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
 
 instance MonadState s (IRC s) where
   state f = do
-    tvar <- _userState <$> ask
+    tvar <- asks _userState
     liftIO . atomically $ do
       (a, s) <- f <$> readTVar tvar
       writeTVar tvar s
       pure a
-
+  get = do
+    tvar <- asks _userState
+    liftIO $ atomically (readTVar tvar)
+  put s = do
+    tvar <- asks _userState
+    liftIO $ atomically (writeTVar tvar s)
 
 -------------------------------------------------------------------------------
 -- * State
