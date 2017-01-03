@@ -17,6 +17,7 @@
 -- of this library.
 module Network.IRC.Client.Internal.Types where
 
+import Control.Applicative (Const)
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
 import Control.Exception      (Exception)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -25,7 +26,6 @@ import Control.Monad.State    (MonadState(..))
 import Data.ByteString        (ByteString)
 import Data.Conduit           (Consumer, Producer)
 import Data.Conduit.TMChan    (TBMChan)
-import Data.Functor.Const (Const)
 import Data.Functor.Contravariant (Contravariant)
 import Data.Text              (Text)
 import Data.Time.Clock        (NominalDiffTime)
