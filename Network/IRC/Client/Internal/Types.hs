@@ -25,6 +25,8 @@ import Control.Monad.State    (MonadState(..))
 import Data.ByteString        (ByteString)
 import Data.Conduit           (Consumer, Producer)
 import Data.Conduit.TMChan    (TBMChan)
+import Data.Functor.Const (Const)
+import Data.Functor.Contravariant (Contravariant)
 import Data.Text              (Text)
 import Data.Time.Clock        (NominalDiffTime)
 import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage)
@@ -156,3 +158,9 @@ type Lens s t a b = forall f. Functor f => (a -> f b) -> s -> f t
 
 -- | A @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Type.html#t:Simple Simple>@ 'Lens'.
 type Lens' s a = Lens s s a a
+
+-- | See @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Getter.html#t:Getter Control.Lens.Getter.Getter>@.
+type Getter s a = forall f. (Contravariant f, Functor f) => (a -> f a) -> s -> f s
+
+-- | See @<http://hackage.haskell.org/package/lens/docs/Control-Lens-Getter.html#t:Getting Control.Lens.Getter.Getting>@.
+type Getting r s a = (a -> Const r a) -> s -> Const r s

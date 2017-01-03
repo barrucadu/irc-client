@@ -36,11 +36,17 @@ import Network.IRC.Client.Internal.Types
     F :: Lens' S A; \
     F = \ afb s -> (\ b -> s {_/**/F = b}) <$> afb (_/**/F s)
 
+#define GETTER(S,F,A) \
+    {-# INLINE F #-}; \
+    {-| PRIME()Getter' for '_/**/F'. -}; \
+    F :: Getter S A; \
+    F = \ afb s -> (\ b -> s {_/**/F = b}) <$> afb (_/**/F s)
+
 
 -------------------------------------------------------------------------------
 -- * Lenses for 'IRCState'
 
-LENS((IRCState s),connectionConfig,(ConnectionConfig s))
+GETTER((IRCState s),connectionConfig,(ConnectionConfig s))
 LENS((IRCState s),userState,(TVar s))
 LENS((IRCState s),instanceConfig,(TVar (InstanceConfig s)))
 LENS((IRCState s),connectionState,(TVar ConnectionState))
@@ -49,8 +55,8 @@ LENS((IRCState s),connectionState,(TVar ConnectionState))
 -------------------------------------------------------------------------------
 -- * Lenses for 'ConnectionConfig'
 
-LENS((ConnectionConfig s),server,ByteString)
-LENS((ConnectionConfig s),port,Int)
+GETTER((ConnectionConfig s),server,ByteString)
+GETTER((ConnectionConfig s),port,Int)
 LENS((ConnectionConfig s),username,Text)
 LENS((ConnectionConfig s),realname,Text)
 LENS((ConnectionConfig s),password,(Maybe Text))
@@ -82,7 +88,7 @@ LENS((EventHandler s),eventFunc,(Event Text -> IRC s ()))
 -- * Utilities
 
 -- | Get a value from a lens.
-get :: Lens' s a -> s -> a
+get :: Getting a s a -> s -> a
 get lens = getConst . lens Const
 
 -- | Set a value in a lens.
@@ -94,7 +100,7 @@ modify :: Lens' s a -> (a -> a) -> s -> s
 modify lens f s = let a = get lens s in set lens (f a) s
 
 -- | Atomically snapshot some shared state.
-snapshot :: MonadIO m => Lens' s (TVar a) -> s -> m a
+snapshot :: MonadIO m => Getting (TVar a) s (TVar a) -> s -> m a
 snapshot lens = liftIO . atomically . readTVar . get lens
 
 -- | Atomically snapshot and modify some shared state.
