@@ -45,6 +45,7 @@ import Network.IRC.Client.Internal.Types
 LENS((IRCState s),connectionConfig,(ConnectionConfig s))
 LENS((IRCState s),userState,(TVar s))
 LENS((IRCState s),instanceConfig,(TVar (InstanceConfig s)))
+LENS((IRCState s),sendqueue,(TBMChan IrcMessage))
 LENS((IRCState s),connectionState,(TVar ConnectionState))
 
 
@@ -52,7 +53,6 @@ LENS((IRCState s),connectionState,(TVar ConnectionState))
 -- * Lenses for 'ConnectionConfig'
 
 LENS((ConnectionConfig s),func,(IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()))
-LENS((ConnectionConfig s),sendqueue,(TBMChan IrcMessage))
 LENS((ConnectionConfig s),server,ByteString)
 LENS((ConnectionConfig s),port,Int)
 LENS((ConnectionConfig s),username,Text)

@@ -28,7 +28,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader   (ask, runReaderT)
 import Data.ByteString        (ByteString)
 import Data.Conduit           (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
-import Data.Conduit.TMChan    (closeTBMChan, isEmptyTBMChan, newTBMChanIO, sourceTBMChan, writeTBMChan)
+import Data.Conduit.TMChan    (closeTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan)
 import Data.IORef             (IORef, newIORef, readIORef, writeIORef)
 import Data.Text              (Text)
 import Data.Text.Encoding     (decodeUtf8, encodeUtf8)
@@ -50,8 +50,8 @@ import Network.IRC.Client.Lens
 -- * Connecting to an IRC network
 
 -- | Connect to a server using the supplied connection function.
-connectInternal :: MonadIO m
-  => (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
+connectInternal
+  :: (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
   -- ^ Function to start the network conduits.
   -> IRC s ()
   -- ^ Connect handler
@@ -65,24 +65,20 @@ connectInternal :: MonadIO m
   -- ^ Server port
   -> NominalDiffTime
   -- ^ Flood timeout
-  -> m (ConnectionConfig s)
-connectInternal f oncon ondis logf host port_ flood_ = liftIO $ do
-  queueS <- newTBMChanIO 16
-
-  return ConnectionConfig
-    { _func         = f
-    , _sendqueue    = queueS
-    , _username     = "irc-client"
-    , _realname     = "irc-client"
-    , _password     = Nothing
-    , _server       = host
-    , _port         = port_
-    , _flood        = flood_
-    , _timeout      = 300
-    , _onconnect    = oncon
-    , _ondisconnect = ondis
-    , _logfunc      = logf
-    }
+  -> ConnectionConfig s
+connectInternal f oncon ondis logf host port_ flood_ = ConnectionConfig
+  { _func         = f
+  , _username     = "irc-client"
+  , _realname     = "irc-client"
+  , _password     = Nothing
+  , _server       = host
+  , _port         = port_
+  , _flood        = flood_
+  , _timeout      = 300
+  , _onconnect    = oncon
+  , _ondisconnect = ondis
+  , _logfunc      = logf
+  }
 
 
 -------------------------------------------------------------------------------
@@ -113,7 +109,7 @@ runner = do
   -- An IORef to keep track of the time of the last received message, to allow a local timeout.
   lastReceived <- liftIO $ newIORef =<< getCurrentTime
 
-  let source = toProducer $ sourceTBMChan (_sendqueue cconf)
+  let source = toProducer $ sourceTBMChan (_sendqueue state)
                           $= antiflood
                           $= logConduit (_logfunc cconf FromClient . toByteString)
   let sink   = forgetful =$= logConduit (_logfunc cconf FromServer . _raw)
@@ -233,7 +229,7 @@ send = sendBS . fmap encodeUtf8
 -- sent too rapidly.
 sendBS :: IrcMessage -> IRC s ()
 sendBS msg = do
-  queue <- _sendqueue . _connectionConfig <$> getIrcState
+  queue <- _sendqueue <$> getIrcState
   liftIO . atomically $ writeTBMChan queue msg
 
 
@@ -253,8 +249,7 @@ disconnect = do
       liftIO . atomically $ writeTVar (_connectionState s) Disconnecting
 
       -- Wait for all messages to be sent, or a minute has passed.
-      let queueS = _sendqueue (_connectionConfig s)
-      timeoutBlock 60 . atomically $ isEmptyTBMChan queueS
+      timeoutBlock 60 . atomically $ isEmptyTBMChan (_sendqueue s)
 
       -- Then close the connection
       disconnectNow
@@ -267,8 +262,7 @@ disconnectNow :: IRC s ()
 disconnectNow = do
   s <- getIrcState
   liftIO . atomically $ do
-    let queueS = _sendqueue (_connectionConfig s)
-    closeTBMChan queueS
+    closeTBMChan (_sendqueue s)
     writeTVar (_connectionState s) Disconnected
 
 

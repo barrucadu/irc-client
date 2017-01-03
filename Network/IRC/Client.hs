@@ -73,6 +73,7 @@ import Control.Monad.IO.Class     (MonadIO, liftIO)
 import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString            (ByteString)
 import qualified Data.Conduit.Network.TLS as TLS
+import Data.Conduit.TMChan (newTBMChanIO)
 import Data.Text                  (Text)
 import qualified Data.Text as T
 import Data.Time.Clock            (NominalDiffTime)
@@ -95,40 +96,40 @@ import qualified Paths_irc_client as Paths
 -- * Connecting to an IRC network
 
 -- | Connect to a server without TLS.
-connect :: MonadIO m
-  => ByteString
+connect
+  :: ByteString
   -- ^ The hostname
   -> Int
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connect = connect' noopLogger
 
 -- | Connect to a server with TLS.
-connectWithTLS :: MonadIO m
-  => ByteString
+connectWithTLS
+  :: ByteString
   -- ^ The hostname
   -> Int
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connectWithTLS = connectWithTLS' noopLogger
 
 -- | Connect to a server with TLS using the given TLS config.
-connectWithTLSConfig :: MonadIO m
-  => TLS.TLSClientConfig
+connectWithTLSConfig
+  :: TLS.TLSClientConfig
   -- ^ The TLS config
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connectWithTLSConfig = connectWithTLSConfig' noopLogger
 
 -- | Connect to a server with TLS using the given certificate
 -- verifier.
-connectWithTLSVerify :: MonadIO m
-  => (X.CertificateStore -> TLS.ValidationCache -> X.ServiceID -> X.CertificateChain -> IO [X.FailedReason])
+connectWithTLSVerify
+  :: (X.CertificateStore -> TLS.ValidationCache -> X.ServiceID -> X.CertificateChain -> IO [X.FailedReason])
   -- ^ The certificate verifier. Returns an empty list if the cert is
   -- good.
   -> ByteString
@@ -137,13 +138,13 @@ connectWithTLSVerify :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connectWithTLSVerify = connectWithTLSVerify' noopLogger
 
 -- | Connect to a server without TLS, with the provided logging
 -- function.
-connect' :: MonadIO m
-  => (Origin -> ByteString -> IO ())
+connect'
+  :: (Origin -> ByteString -> IO ())
   -- ^ The message logger
   -> ByteString
   -- ^ The hostname
@@ -151,13 +152,13 @@ connect' :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connect' lg host port_ =
   connectInternal (C.ircClient port_ host) defaultOnConnect defaultOnDisconnect lg host port_
 
 -- | Connect to a server with TLS, with the provided logging function.
-connectWithTLS' :: MonadIO m
-  => (Origin -> ByteString -> IO ())
+connectWithTLS'
+  :: Origin -> ByteString -> IO ()
   -- ^ The message logger
   -> ByteString
   -- ^ The hostname
@@ -165,20 +166,20 @@ connectWithTLS' :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connectWithTLS' lg host port_ =
   connectInternal (C.ircTLSClient port_ host) defaultOnConnect defaultOnDisconnect lg host port_
 
 -- | Connect to a server with TLS using the given TLS config, with the
 -- provided logging function.
-connectWithTLSConfig' :: MonadIO m
-  => (Origin -> ByteString -> IO ())
+connectWithTLSConfig'
+  :: (Origin -> ByteString -> IO ())
   -- ^ The message logger
   -> TLS.TLSClientConfig
   -- ^ The TLS config
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connectWithTLSConfig' lg cfg =
   connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port_
   where
@@ -187,8 +188,8 @@ connectWithTLSConfig' lg cfg =
 
 -- | Connect to a server with TLS using the given certificate
 -- verifier, with the provided logging function.
-connectWithTLSVerify' :: MonadIO m
-  => (Origin -> ByteString -> IO ())
+connectWithTLSVerify'
+  :: (Origin -> ByteString -> IO ())
   -- ^ The message logger
   -> (X.CertificateStore -> TLS.ValidationCache -> X.ServiceID -> X.CertificateChain -> IO [X.FailedReason])
   -- ^ The certificate verifier. Returns an empty list if the cert is
@@ -199,7 +200,7 @@ connectWithTLSVerify' :: MonadIO m
   -- ^ The port
   -> NominalDiffTime
   -- ^ The flood cooldown
-  -> m (ConnectionConfig s)
+  -> ConnectionConfig s
 connectWithTLSVerify' lg verifier host port_ =
   connectInternal (C.ircTLSClient' cfg) defaultOnConnect defaultOnDisconnect lg host port_
   where
@@ -243,14 +244,16 @@ defaultIRCConf n = InstanceConfig
 
 -- | Construct a new IRC state
 newIRCState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IRCState s)
-newIRCState cconf iconf ustate = do
-  ustvar <- liftIO . atomically . newTVar $ ustate
-  ictvar <- liftIO . atomically . newTVar $ iconf
-  cstvar <- liftIO . atomically . newTVar $ Disconnected
+newIRCState cconf iconf ustate = liftIO $ do
+  ustvar <- atomically . newTVar $ ustate
+  ictvar <- atomically . newTVar $ iconf
+  cstvar <- atomically . newTVar $ Disconnected
+  squeue <- newTBMChanIO 16
 
   pure IRCState
     { _connectionConfig = cconf
     , _userState        = ustvar
     , _instanceConfig   = ictvar
     , _connectionState  = cstvar
+    , _sendqueue        = squeue
     }

@@ -56,6 +56,8 @@ data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
                            -- ^Mutable user state
                            , _instanceConfig   :: TVar (InstanceConfig s)
                            -- ^Mutable instance configuration in STM
+                           , _sendqueue        :: TBMChan IrcMessage
+                           -- ^ Message send queue.
                            , _connectionState  :: TVar ConnectionState
                            -- ^State of the connection.
                            }
@@ -64,8 +66,6 @@ data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
 data ConnectionConfig s = ConnectionConfig
   { _func       :: IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
   -- ^ Function to connect and start the conduits.
-  , _sendqueue  :: TBMChan IrcMessage
-  -- ^ Message send queue.
   , _server     :: ByteString
   -- ^ The server host.
   , _port       :: Int
