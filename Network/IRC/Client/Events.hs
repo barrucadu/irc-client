@@ -74,17 +74,17 @@ import Network.IRC.Client.Utils
 -- Events
 
 -- | Match a CTCP PRIVMSG.
-matchCTCP :: [Text] -> Event Text -> Bool
-matchCTCP verbs ev = case _message ev of
+matchCTCP :: Text -> Event Text -> Bool
+matchCTCP verb ev = case _message ev of
   Privmsg _ (Left ctcpbs) ->
-    let (verb, _) = first toUpper $ fromCTCP ctcpbs
-    in verb `elem` verbs
+    let (v, _) = first toUpper $ fromCTCP ctcpbs
+    in verb == v
   _ -> False
 
 -- | Match a numeric reply.
-matchNumeric :: [Int] -> Event a -> Bool
-matchNumeric nums ev = case _message ev of
-  Numeric num _ -> num `elem` nums
+matchNumeric :: Int -> Event a -> Bool
+matchNumeric num ev = case _message ev of
+  Numeric n _ -> num == n
   _ -> False
 
 -- | A simple predicate to match events of the given type. Refer to
@@ -162,7 +162,7 @@ pingHandler = eventHandler (matchType _Ping) $ \ev -> case _message ev of
 
 -- | Respond to CTCP @PING@ requests.
 ctcpPingHandler :: EventHandler s
-ctcpPingHandler = eventHandler (matchCTCP ["PING"]) $ \ev -> case (_source ev, _message ev) of
+ctcpPingHandler = eventHandler (matchCTCP "PING") $ \ev -> case (_source ev, _message ev) of
   (User n, Privmsg _ (Left ctcpbs)) ->
     let (_, xs) = fromCTCP ctcpbs
     in send $ ctcpReply n "PING" xs
@@ -170,7 +170,7 @@ ctcpPingHandler = eventHandler (matchCTCP ["PING"]) $ \ev -> case (_source ev, _
 
 -- | Respond to CTCP @VERSION@ requests with the version string.
 ctcpVersionHandler :: EventHandler s
-ctcpVersionHandler = eventHandler (matchCTCP ["VERSION"]) $ \ev -> case _source ev of
+ctcpVersionHandler = eventHandler (matchCTCP "VERSION") $ \ev -> case _source ev of
   User n -> do
     ver <- get version <$> (snapshot instanceConfig =<< getIrcState)
     send $ ctcpReply n "VERSION" [ver]
@@ -178,7 +178,7 @@ ctcpVersionHandler = eventHandler (matchCTCP ["VERSION"]) $ \ev -> case _source 
 
 -- | Respond to CTCP @TIME@ requests with the system time.
 ctcpTimeHandler :: EventHandler s
-ctcpTimeHandler = eventHandler (matchCTCP ["TIME"]) $ \ev -> case _source ev of
+ctcpTimeHandler = eventHandler (matchCTCP "TIME") $ \ev -> case _source ev of
   User n -> do
     now <- liftIO getCurrentTime
     send $ ctcpReply n "TIME" [T.pack $ formatTime defaultTimeLocale "%c" now]
@@ -187,7 +187,7 @@ ctcpTimeHandler = eventHandler (matchCTCP ["TIME"]) $ \ev -> case _source ev of
 -- | Update the nick upon welcome (numeric reply 001), as it may not
 -- be what we requested (eg, in the case of a nick too long).
 welcomeNick :: EventHandler s
-welcomeNick = eventHandler (matchNumeric [001]) $ \ev -> case _message ev of
+welcomeNick = eventHandler (matchNumeric 001) $ \ev -> case _message ev of
     Numeric _ xs ->  go xs
     _ -> pure ()
   where
@@ -200,14 +200,14 @@ welcomeNick = eventHandler (matchNumeric [001]) $ \ev -> case _message ev of
 -- | Join default channels upon welcome (numeric reply 001). If sent earlier,
 -- the server might reject the JOIN attempts.
 joinOnWelcome :: EventHandler s
-joinOnWelcome = eventHandler (matchNumeric [001]) $ \_ -> do
+joinOnWelcome = eventHandler (matchNumeric 001) $ \_ -> do
   iconf <- snapshot instanceConfig =<< getIrcState
   mapM_ (send . Join) $ get channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
 nickMangler :: EventHandler s
-nickMangler = eventHandler (matchNumeric [432, 433, 436]) $ \ev -> case _message ev of
+nickMangler = eventHandler (\ev -> any (($ev) . matchNumeric) [432, 433, 436]) $ \ev -> case _message ev of
     Numeric 432 xs -> go fresh xs
     Numeric 433 xs -> go mangle xs
     Numeric 436 xs -> go mangle xs
@@ -263,7 +263,7 @@ nickMangler = eventHandler (matchNumeric [432, 433, 436]) $ \ev -> case _message
 -- | Upon receiving a channel topic (numeric reply 332), add the
 -- channel to the list (if not already present).
 joinHandler :: EventHandler s
-joinHandler = eventHandler (matchNumeric [332]) $ \ev -> case _message ev of
+joinHandler = eventHandler (matchNumeric 332) $ \ev -> case _message ev of
     Numeric _ xs -> go xs
     _ -> pure ()
   where
