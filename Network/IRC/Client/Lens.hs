@@ -9,11 +9,13 @@
 -- Stability   : experimental
 -- Portability : CPP, ImpredicativeTypes
 --
--- Lenses.
+-- 'Lens'es, 'Prism's, and utilities for dealing with optics without
+-- depending on the lens library.
 module Network.IRC.Client.Lens where
 
 import Control.Concurrent.STM (TVar)
 import Data.ByteString (ByteString)
+import Data.Profunctor (Choice (right'), Profunctor (dimap))
 import Data.Text (Text)
 import Data.Time (NominalDiffTime)
 import Network.IRC.Conduit
@@ -37,6 +39,13 @@ import Network.IRC.Client.Internal.Types
     {-| PRIME()Getter' for '_/**/F'. -}; \
     F :: Getter S A; \
     F = \ afb s -> (\ b -> s {_/**/F = b}) <$> afb (_/**/F s)
+
+#define PRISM(S,C,ARG,TUP,A) \
+    {-| PRIME()Prism' for 'C'. -}; \
+    {-# INLINE _/**/C #-}; \
+    _/**/C :: Prism' S A; \
+    _/**/C = dimap (\ s -> case s of C ARG -> Right TUP; _ -> Left s) \
+        (either pure $ fmap (\ TUP -> C ARG)) . right'
 
 
 -------------------------------------------------------------------------------
@@ -78,3 +87,18 @@ LENS((InstanceConfig s),ignore,[(Text, Maybe Text)])
 
 LENS((EventHandler s),eventPred,(Event Text -> Bool))
 LENS((EventHandler s),eventFunc,(Event Text -> IRC s ()))
+
+
+-------------------------------------------------------------------------------
+-- * Prisms for 'ConnectionState'
+
+PRISM(ConnectionState,Connected,,(),())
+PRISM(ConnectionState,Disconnecting,,(),())
+PRISM(ConnectionState,Disconnected,,(),())
+
+
+-------------------------------------------------------------------------------
+-- * Prisms for 'Origin'
+
+PRISM(Origin,FromServer,,(),())
+PRISM(Origin,FromClient,,(),())
