@@ -67,7 +67,7 @@ data IrcState s = IrcState { _connectionConfig :: ConnectionConfig s
                            -- ^State of the connection.
                            }
 
--- | The static state of an IRC server connection. Lenses are provided to modify this before
+-- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
   { _func       :: IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
   -- ^ Function to connect and start the conduits.

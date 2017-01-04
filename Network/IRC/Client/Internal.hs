@@ -52,10 +52,11 @@ import Network.IRC.Client.Lens
 
 
 -------------------------------------------------------------------------------
--- * Connecting to an IRC network
+-- * Configuration
 
--- | Connect to a server using the supplied connection function.
-connectInternal
+-- | Config to connect to a server using the supplied connection
+-- function.
+setupInternal
   :: (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
   -- ^ Function to start the network conduits.
   -> Irc s ()
@@ -68,17 +69,15 @@ connectInternal
   -- ^ Server hostname
   -> Int
   -- ^ Server port
-  -> NominalDiffTime
-  -- ^ Flood timeout
   -> ConnectionConfig s
-connectInternal f oncon ondis logf host port_ flood_ = ConnectionConfig
+setupInternal f oncon ondis logf host port_ = ConnectionConfig
   { _func         = f
   , _username     = "irc-client"
   , _realname     = "irc-client"
   , _password     = Nothing
   , _server       = host
   , _port         = port_
-  , _flood        = flood_
+  , _flood        = 1
   , _timeout      = 300
   , _onconnect    = oncon
   , _ondisconnect = ondis
