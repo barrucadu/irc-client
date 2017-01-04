@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ImpredicativeTypes #-}
 
 -- |
 -- Module      : Network.IRC.Client.Lens
@@ -7,10 +6,9 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : CPP, ImpredicativeTypes
+-- Portability : CPP
 --
--- 'Lens'es, 'Prism's, and utilities for dealing with optics without
--- depending on the lens library.
+-- 'Lens'es and 'Prism's.
 module Network.IRC.Client.Lens where
 
 import Control.Concurrent.STM (TVar)
