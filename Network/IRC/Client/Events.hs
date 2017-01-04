@@ -39,6 +39,7 @@ module Network.IRC.Client.Events
   , Event(..)
   , Message(..)
   , Source(..)
+  , module Network.IRC.Conduit.Lens
   ) where
 
 import Control.Applicative    ((<$>))
