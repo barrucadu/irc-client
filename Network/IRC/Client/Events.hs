@@ -10,17 +10,15 @@
 -- Stability   : experimental
 -- Portability : CPP, OverloadedStrings
 --
--- | Events and event handlers. Handlers are invoked concurrently when
--- matching events are received from the server.
+-- Events and event handlers. When a message is received from the
+-- server, all matching handlers are executed concurrently.
 module Network.IRC.Client.Events
-  ( -- * Event matching
-    matchCTCP
+  ( -- * Handlers
+    EventHandler
+  , eventHandler
+  , matchCTCP
   , matchNumeric
   , matchType
-
-    -- * Handlers
-  , EventHandler
-  , eventHandler
 
   -- * Default handlers
   , defaultEventHandlers
@@ -44,7 +42,6 @@ module Network.IRC.Client.Events
   ) where
 
 import Control.Applicative    ((<$>))
-import Control.Arrow          (first)
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char              (isAlphaNum)
@@ -70,33 +67,12 @@ import Network.IRC.Client.Internal
 import Network.IRC.Client.Lens
 import Network.IRC.Client.Utils
 
--------------------------------------------------------------------------------
--- Events
-
--- | Match a CTCP PRIVMSG.
-matchCTCP :: Text -> Event Text -> Bool
-matchCTCP verb ev = case _message ev of
-  Privmsg _ (Left ctcpbs) ->
-    let (v, _) = first toUpper $ fromCTCP ctcpbs
-    in verb == v
-  _ -> False
-
--- | Match a numeric reply.
-matchNumeric :: Int -> Event a -> Bool
-matchNumeric num ev = case _message ev of
-  Numeric n _ -> num == n
-  _ -> False
-
--- | A simple predicate to match events of the given type. Refer to
--- "Network.IRC.Conduit.Lens#Message" for the list of 'Prism''s.
-matchType :: Prism' (Message a) b -> Event a -> Bool
-matchType k = is k . _message
-
 
 -------------------------------------------------------------------------------
--- Event handlers
+-- Handlers
 
--- | Construct an event handler.
+-- | An event handler has two parts: a predicate to determine if the
+-- handler matches the event, and the function to invoke if so.
 eventHandler
   :: (Event Text -> Bool)
   -- ^ Event matching predicate
@@ -104,6 +80,61 @@ eventHandler
   -- ^ Event handler.
   -> EventHandler s
 eventHandler = EventHandler
+
+-- | Match the verb of a CTCP, ignoring case.
+--
+-- > matchCTCP "ping"   ":foo PRIVMSG #bar :\001PING\001"          ==> True
+-- > matchCTCP "PING"   ":foo PRIVMSG #bar :\001PING\001"          ==> True
+-- > matchCTCP "ACTION" ":foo PRIVMSG #bar :\001ACTION dances\001" ==> True
+matchCTCP :: Text -> Event Text -> Bool
+matchCTCP verb ev = case _message ev of
+  Privmsg _ (Left ctcpbs) ->
+    let (v, _) = fromCTCP ctcpbs
+    in toUpper verb == toUpper v
+  _ -> False
+
+-- | Match a numeric server message. Numeric messages are sent in
+-- response to most things, such as connecting to the server, or
+-- joining a channel.
+--
+-- Numerics in the range 001 to 099 are informative messages, numerics
+-- in the range 200 to 399 are responses to commands. Some common
+-- numerics are:
+--
+--    - 001 (RPL_WELCOME), sent after successfully connecting.
+--
+--    - 331 (RPL_NOTOPIC), sent after joining a channel if it has no
+--      topic.
+--
+--    - 332 (RPL_TOPIC), sent after joining a channel if it has a
+--      topic.
+--
+--    - 432 (ERR_ERRONEUSNICKNAME), sent after trying to change to an
+--      invalid nick.
+--
+--    - 433 (ERR_NICKNAMEINUSE), sent after trying to change to a nick
+--      already in use.
+--
+--    - 436 (ERR_NICKCOLLISION), sent after trying to change to a nick
+--      in use on another server.
+--
+-- See Section 5 of @<https://tools.ietf.org/html/rfc2812#section-5
+-- RFC 2812>@ for a complete list.
+--
+-- > matchNumeric 001 "001 :Welcome to irc.example.com" ==> True
+-- > matchNumeric 332 "332 :#haskell: We like Haskell"  ==> True
+matchNumeric :: Int -> Event a -> Bool
+matchNumeric num ev = case _message ev of
+  Numeric n _ -> num == n
+  _ -> False
+
+-- | A simple predicate to match events of the given type. Refer to
+-- "Network.IRC.Conduit.Lens#Message" for the list of 'Prism''s.
+--
+-- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> True
+-- > matchType _Quit    ":foo QUIT :goodbye world"       ==> True
+matchType :: Prism' (Message a) b -> Event a -> Bool
+matchType k = is k . _message
 
 
 -------------------------------------------------------------------------------
@@ -119,13 +150,6 @@ eventHandler = EventHandler
 --   server modifies it;
 -- - mangle the nick if the server reports a collision;
 -- - update the channel list on @JOIN@ and @KICK@.
---
--- These event handlers are all exposed through the
--- Network.IRC.Client.Events module, so you can use them directly if
--- you are building up your 'InstanceConfig' from scratch.
---
--- If you are building a bot, you may want to write an event handler
--- to process messages representing commands.
 defaultEventHandlers :: [EventHandler s]
 defaultEventHandlers =
   [ pingHandler
