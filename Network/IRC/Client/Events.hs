@@ -34,6 +34,7 @@ module Network.IRC.Client.Events
   , ctcpTimeHandler
   , welcomeNick
   , joinOnWelcome
+  , joinHandler
   , nickMangler
 
   -- * Re-exported
