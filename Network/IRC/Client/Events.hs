@@ -260,10 +260,10 @@ nickMangler = eventHandler (\ev -> any (($ev) . matchNumeric) [432, 433, 436]) $
       _ -> transform trs txt
     transform [] _ = Nothing
 
--- | Upon receiving a channel topic (numeric reply 332), add the
--- channel to the list (if not already present).
+-- | Upon joining a channel (numeric reply 331 or 332), add it to the
+-- list (if not already present).
 joinHandler :: EventHandler s
-joinHandler = eventHandler (matchNumeric 332) $ \ev -> case _message ev of
+joinHandler = eventHandler (\ev -> matchNumeric 331 ev || matchNumeric 332 ev) $ \ev -> case _message ev of
     Numeric _ xs -> go xs
     _ -> pure ()
   where
