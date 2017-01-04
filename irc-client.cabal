@@ -74,10 +74,11 @@ library
                      , Network.IRC.Client.Internal.Types
                      , Network.IRC.Client.Lens
                      , Network.IRC.Client.Utils
-  
+
   -- Modules included in this library but not exported.
-  -- other-modules:       
-  
+  other-modules:
+    Paths_irc_client
+
   -- Compile with -Wall by default
   ghc-options:         -Wall
   
