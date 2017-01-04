@@ -10,6 +10,9 @@
 --
 -- Types and functions for dealing with optics without depending on
 -- the lens library.
+--
+-- This module is NOT considered to form part of the public interface
+-- of this library.
 module Network.IRC.Client.Internal.Lens where
 
 import Control.Applicative (Const(..))
