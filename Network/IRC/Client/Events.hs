@@ -8,7 +8,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : CPP, OverloadedStrings
+-- Portability : CPP, OverloadedStrings, RankNTypes
 --
 -- Events and event handlers. When a message is received from the
 -- server, all matching handlers are executed concurrently.
