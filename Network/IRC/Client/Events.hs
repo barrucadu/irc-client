@@ -99,7 +99,7 @@ matchType k = is k . _message
 eventHandler
   :: (Event Text -> Bool)
   -- ^ Event matching predicate
-  -> (Event Text -> IRC s ())
+  -> (Event Text -> Irc s ())
   -- ^ Event handler.
   -> EventHandler s
 eventHandler = EventHandler
@@ -139,14 +139,14 @@ defaultEventHandlers =
   ]
 
 -- | The default connect handler: set the nick.
-defaultOnConnect :: IRC s ()
+defaultOnConnect :: Irc s ()
 defaultOnConnect = do
   iconf <- snapshot instanceConfig =<< getIrcState
   send . Nick $ get nick iconf
 
 -- | The default disconnect handler: do nothing. You might want to
 -- override this with one which reconnects.
-defaultOnDisconnect :: IRC s ()
+defaultOnDisconnect :: Irc s ()
 defaultOnDisconnect = return ()
 
 
@@ -154,13 +154,13 @@ defaultOnDisconnect = return ()
 -- Individual handlers
 
 -- | Respond to server @PING@ messages with a @PONG@.
-pingHandler :: Event Text -> IRC s ()
+pingHandler :: Event Text -> Irc s ()
 pingHandler ev = case _message ev of
   Ping s1 s2 -> send . Pong $ fromMaybe s1 s2
   _ -> return ()
 
 -- | Respond to CTCP @PING@ requests.
-ctcpPingHandler :: Event Text -> IRC s ()
+ctcpPingHandler :: Event Text -> Irc s ()
 ctcpPingHandler ev = case (_source ev, _message ev) of
   (User n, Privmsg _ (Left ctcpbs)) ->
     let (_, xs) = fromCTCP ctcpbs
@@ -168,7 +168,7 @@ ctcpPingHandler ev = case (_source ev, _message ev) of
   _ -> pure ()
 
 -- | Respond to CTCP @VERSION@ requests with the version string.
-ctcpVersionHandler :: Event Text -> IRC s ()
+ctcpVersionHandler :: Event Text -> Irc s ()
 ctcpVersionHandler ev = case _source ev of
   User n -> do
     ver <- get version <$> (snapshot instanceConfig =<< getIrcState)
@@ -176,7 +176,7 @@ ctcpVersionHandler ev = case _source ev of
   _ -> pure ()
 
 -- | Respond to CTCP @TIME@ requests with the system time.
-ctcpTimeHandler :: Event Text -> IRC s ()
+ctcpTimeHandler :: Event Text -> Irc s ()
 ctcpTimeHandler ev = case _source ev of
   User n -> do
     now <- liftIO getCurrentTime
@@ -185,7 +185,7 @@ ctcpTimeHandler ev = case _source ev of
 
 -- | Update the nick upon welcome (numeric reply 001), as it may not
 -- be what we requested (eg, in the case of a nick too long).
-welcomeNick :: Event Text -> IRC s ()
+welcomeNick :: Event Text -> Irc s ()
 welcomeNick ev = case _message ev of
     Numeric _ xs ->  go xs
     _ -> pure ()
@@ -198,14 +198,14 @@ welcomeNick ev = case _message ev of
 
 -- | Join default channels upon welcome (numeric reply 001). If sent earlier,
 -- the server might reject the JOIN attempts.
-joinOnWelcome :: Event Text -> IRC s ()
+joinOnWelcome :: Event Text -> Irc s ()
 joinOnWelcome _ = do
   iconf <- snapshot instanceConfig =<< getIrcState
   mapM_ (send . Join) $ get channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
-nickMangler :: Event Text -> IRC s ()
+nickMangler :: Event Text -> Irc s ()
 nickMangler ev = case _message ev of
     Numeric 432 xs -> go fresh xs
     Numeric 433 xs -> go mangle xs
@@ -261,7 +261,7 @@ nickMangler ev = case _message ev of
 
 -- | Upon receiving a channel topic (numeric reply 332), add the
 -- channel to the list (if not already present).
-joinHandler :: Event Text -> IRC s ()
+joinHandler :: Event Text -> Irc s ()
 joinHandler ev = case _message ev of
     Numeric _ xs -> go xs
     _ -> pure ()
@@ -277,7 +277,7 @@ joinHandler ev = case _message ev of
     go _ = pure ()
 
 -- | Update the channel list upon being kicked.
-kickHandler :: Event Text -> IRC s ()
+kickHandler :: Event Text -> Irc s ()
 kickHandler ev = do
   tvarI <- get instanceConfig <$> getIrcState
   liftIO . atomically $ do

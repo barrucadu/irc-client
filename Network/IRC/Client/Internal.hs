@@ -58,9 +58,9 @@ import Network.IRC.Client.Lens
 connectInternal
   :: (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
   -- ^ Function to start the network conduits.
-  -> IRC s ()
+  -> Irc s ()
   -- ^ Connect handler
-  -> IRC s ()
+  -> Irc s ()
   -- ^ Disconnect handler
   -> (Origin -> ByteString -> IO ())
   -- ^ Logging function
@@ -90,7 +90,7 @@ connectInternal f oncon ondis logf host port_ flood_ = ConnectionConfig
 -- * Event loop
 
 -- | The event loop.
-runner :: IRC s ()
+runner :: Irc s ()
 runner = do
   state <- getIrcState
   let cconf = _connectionConfig state
@@ -101,7 +101,7 @@ runner = do
   let thePass = get password cconf
 
   -- Initialise the IRC session
-  let initialise = flip runReaderT state . runIRC $ do
+  let initialise = flip runReaderT state . runIrc $ do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
@@ -151,7 +151,7 @@ forgetful = awaitForever go where
 
 -- | Block on receiving a message and invoke all matching handlers
 -- concurrently.
-eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> Consumer IrcEvent m ()
+eventSink :: MonadIO m => IORef UTCTime -> IrcState s -> Consumer IrcEvent m ()
 eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
     -- Record the current time.
@@ -163,14 +163,14 @@ eventSink lastReceived ircstate = go where
     ignored <- isIgnored ircstate event'
     unless ignored $ do
       hs <- getHandlersFor event' . get handlers <$> snapshot instanceConfig ircstate
-      liftIO $ mapM_ (\h -> forkIO $ runReaderT (runIRC $ h event') ircstate) hs
+      liftIO $ mapM_ (\h -> forkIO $ runReaderT (runIrc $ h event') ircstate) hs
 
     -- If disconnected, do not loop.
     disconnected <- liftIO . atomically $ (==Disconnected) <$> getConnectionState ircstate
     unless disconnected go)
 
 -- | Check if an event is ignored or not.
-isIgnored :: MonadIO m => IRCState s -> Event Text -> m Bool
+isIgnored :: MonadIO m => IrcState s -> Event Text -> m Bool
 isIgnored ircstate ev = do
   iconf <- liftIO . atomically . readTVar . _instanceConfig $ ircstate
   let ignoreList = _ignore iconf
@@ -182,7 +182,7 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |Get the event handlers for an event.
-getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> IRC s ()]
+getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> Irc s ()]
 getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _eventPred eh e]
 
 -- |A conduit which logs everything which goes through it.
@@ -227,12 +227,12 @@ noopLogger _ _ = return ()
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
-send :: Message Text -> IRC s ()
+send :: Message Text -> Irc s ()
 send = sendBS . fmap encodeUtf8
 
 -- | Send a message, using TLS if enabled. This blocks if messages are
 -- sent too rapidly.
-sendBS :: IrcMessage -> IRC s ()
+sendBS :: IrcMessage -> Irc s ()
 sendBS msg = do
   queue <- _sendqueue <$> getIrcState
   liftIO . atomically $ writeTBMChan queue msg
@@ -243,7 +243,7 @@ sendBS msg = do
 
 -- | Disconnect from the server, properly tearing down the TLS session
 -- (if there is one).
-disconnect :: IRC s ()
+disconnect :: Irc s ()
 disconnect = do
   s <- getIrcState
 
@@ -263,7 +263,7 @@ disconnect = do
     _ -> pure ()
 
 -- | Disconnect immediately, without waiting for messages to be sent.
-disconnectNow :: IRC s ()
+disconnectNow :: Irc s ()
 disconnectNow = do
   s <- getIrcState
   liftIO . atomically $ do
@@ -275,11 +275,11 @@ disconnectNow = do
 -- * Utils
 
 -- | Access the client state.
-getIrcState :: IRC s (IRCState s)
+getIrcState :: Irc s (IrcState s)
 getIrcState = ask
 
 -- | Get the connection state from an IRC state.
-getConnectionState :: IRCState s -> STM ConnectionState
+getConnectionState :: IrcState s -> STM ConnectionState
 getConnectionState = readTVar . _connectionState
 
 -- | Block until an action is successful or a timeout is reached.

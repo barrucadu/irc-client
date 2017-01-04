@@ -13,7 +13,7 @@
 -- > run :: ByteString -> Int -> Text -> IO ()
 -- > run host port nick = do
 -- >   conn <- connect host port 1
--- >   let cfg = defaultIRCConf nick
+-- >   let cfg = defaultIrcConf nick
 -- >   let cfg' = modify handlers (yourCustomEventHandlers:) cfg
 -- >   start conn cfg'
 --
@@ -47,15 +47,15 @@ module Network.IRC.Client
   , module Network.IRC.Client.Lens
 
   -- * The IRC monad
-  , IRC(..)
-  , IRCState
-  , newIRCState
+  , Irc(..)
+  , IrcState
+  , newIrcState
   , getIrcState
   , ConnectionState(..)
   , getConnectionState
   , ConnectionConfig
   , InstanceConfig
-  , defaultIRCConf
+  , defaultIrcConf
   , Timeout(..)
 
   -- * Utilities
@@ -160,17 +160,17 @@ connectWithTLSVerify verifier host port_ =
 -- | Run the event loop for a server, receiving messages and handing
 -- them off to handlers as appropriate.
 start :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m ()
-start cconf iconf ustate = newIRCState cconf iconf ustate >>= start'
+start cconf iconf ustate = newIrcState cconf iconf ustate >>= start'
 
--- | Like 'start', but use the provided initial 'IRCState'.
-start' :: MonadIO m => IRCState s -> m ()
-start' = liftIO . runReaderT (runIRC runner)
+-- | Like 'start', but use the provided initial 'IrcState'.
+start' :: MonadIO m => IrcState s -> m ()
+start' = liftIO . runReaderT (runIrc runner)
 
 -- * Default configuration
 
 -- | Construct a default IRC configuration from a nick
-defaultIRCConf :: Text -> InstanceConfig s
-defaultIRCConf n = InstanceConfig
+defaultIrcConf :: Text -> InstanceConfig s
+defaultIrcConf n = InstanceConfig
   { _nick     = n
   , _channels = []
   , _version  = T.append "irc-client-" (T.pack $ showVersion Paths.version)
@@ -182,14 +182,14 @@ defaultIRCConf n = InstanceConfig
 -- State
 
 -- | Construct a new IRC state
-newIRCState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IRCState s)
-newIRCState cconf iconf ustate = liftIO $ do
+newIrcState :: MonadIO m => ConnectionConfig s -> InstanceConfig s -> s -> m (IrcState s)
+newIrcState cconf iconf ustate = liftIO $ do
   ustvar <- atomically . newTVar $ ustate
   ictvar <- atomically . newTVar $ iconf
   cstvar <- atomically . newTVar $ Disconnected
   squeue <- newTBMChanIO 16
 
-  pure IRCState
+  pure IrcState
     { _connectionConfig = cconf
     , _userState        = ustvar
     , _instanceConfig   = ictvar

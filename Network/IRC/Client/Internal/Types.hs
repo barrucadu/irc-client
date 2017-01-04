@@ -34,10 +34,10 @@ import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage)
 -- * The IRC monad
 
 -- | The IRC monad.
-newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IRCState s))
+newtype Irc s a = Irc { runIrc :: ReaderT (IrcState s) IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IrcState s))
 
-instance MonadState s (IRC s) where
+instance MonadState s (Irc s) where
   state f = do
     tvar <- asks _userState
     liftIO . atomically $ do
@@ -55,7 +55,7 @@ instance MonadState s (IRC s) where
 -- * State
 
 -- | The state of an IRC session.
-data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
+data IrcState s = IrcState { _connectionConfig :: ConnectionConfig s
                            -- ^Read-only connection configuration
                            , _userState        :: TVar s
                            -- ^Mutable user state
@@ -87,10 +87,10 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ The maximum time between received messages from the server. If no
   -- messages arrive from the server for this period, the client is sent
   -- a 'Timeout' exception and disconnects.
-  , _onconnect  :: IRC s ()
+  , _onconnect  :: Irc s ()
   -- ^ Action to run after sending the @PASS@ and @USER@ commands to the
   -- server. The default behaviour is to send the @NICK@ command.
-  , _ondisconnect :: IRC s ()
+  , _ondisconnect :: Irc s ()
   -- ^ Action to run after disconnecting from the server, both by local
   -- choice and by losing the connection. This is run after tearing down the
   -- connection. The default behaviour is to do nothing.
@@ -132,7 +132,7 @@ data Origin = FromServer | FromClient
 data EventHandler s = EventHandler
   { _eventPred :: Event Text -> Bool
   -- ^ The predicate to match on.
-  , _eventFunc :: Event Text -> IRC s ()
+  , _eventFunc :: Event Text -> Irc s ()
   -- ^ The function to call.
   }
 

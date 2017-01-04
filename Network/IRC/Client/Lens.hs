@@ -51,10 +51,10 @@ import Network.IRC.Client.Internal.Types
 -------------------------------------------------------------------------------
 -- * Lenses for 'IRCState'
 
-GETTER((IRCState s),connectionConfig,(ConnectionConfig s))
-LENS((IRCState s),userState,(TVar s))
-LENS((IRCState s),instanceConfig,(TVar (InstanceConfig s)))
-LENS((IRCState s),connectionState,(TVar ConnectionState))
+GETTER((IrcState s),connectionConfig,(ConnectionConfig s))
+LENS((IrcState s),userState,(TVar s))
+LENS((IrcState s),instanceConfig,(TVar (InstanceConfig s)))
+LENS((IrcState s),connectionState,(TVar ConnectionState))
 
 
 -------------------------------------------------------------------------------
@@ -67,8 +67,8 @@ LENS((ConnectionConfig s),realname,Text)
 LENS((ConnectionConfig s),password,(Maybe Text))
 LENS((ConnectionConfig s),flood,NominalDiffTime)
 LENS((ConnectionConfig s),timeout,NominalDiffTime)
-LENS((ConnectionConfig s),onconnect,(IRC s ()))
-LENS((ConnectionConfig s),ondisconnect,(IRC s ()))
+LENS((ConnectionConfig s),onconnect,(Irc s ()))
+LENS((ConnectionConfig s),ondisconnect,(Irc s ()))
 LENS((ConnectionConfig s),logfunc,(Origin -> ByteString -> IO ()))
 
 
@@ -86,7 +86,7 @@ LENS((InstanceConfig s),ignore,[(Text, Maybe Text)])
 -- * Lenses for 'EventHandler'
 
 LENS((EventHandler s),eventPred,(Event Text -> Bool))
-LENS((EventHandler s),eventFunc,(Event Text -> IRC s ()))
+LENS((EventHandler s),eventFunc,(Event Text -> Irc s ()))
 
 
 -------------------------------------------------------------------------------
