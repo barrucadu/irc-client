@@ -40,10 +40,10 @@ module Network.IRC.Client.Utils
 
 import Control.Concurrent.STM (TVar, STM, atomically, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
-import Data.Text              (Text)
+import Data.Text (Text)
 import qualified Data.Text as T
-import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
-import Network.IRC.CTCP       (toCTCP)
+import Network.IRC.Conduit (Event(..), Message(..), Source(..))
+import Network.IRC.CTCP (toCTCP)
 
 import Network.IRC.Client.Internal
 import Network.IRC.Client.Lens

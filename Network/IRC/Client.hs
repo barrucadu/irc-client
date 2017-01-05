@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- |
 -- Module      : Network.IRC.Client
@@ -276,9 +276,9 @@ newIrcState :: MonadIO m
   -- ^ The initial value for the user state.
   -> m (IrcState s)
 newIrcState cconf iconf ustate = liftIO $ do
-  ustvar <- newTVarIO $ ustate
-  ictvar <- newTVarIO $ iconf
-  cstvar <- newTVarIO $ Disconnected
+  ustvar <- newTVarIO ustate
+  ictvar <- newTVarIO iconf
+  cstvar <- newTVarIO Disconnected
   squeue <- newTBMChanIO 16
 
   pure IrcState

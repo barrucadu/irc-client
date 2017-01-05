@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP               #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -42,24 +42,23 @@ module Network.IRC.Client.Events
   , module Network.IRC.Conduit.Lens
   ) where
 
-import Control.Applicative    ((<$>), (<|>))
+import Control.Applicative ((<$>), (<|>))
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
-import Data.Char              (isAlphaNum)
-import Data.Maybe             (fromMaybe)
-import Data.Monoid            ((<>))
-import Data.Text              (Text, breakOn, takeEnd, toUpper)
-import Data.Time.Clock        (getCurrentTime)
-import Data.Time.Format       (formatTime)
-import Network.IRC.Conduit    (Event(..), Message(..), Source(..))
-import Network.IRC.CTCP       (fromCTCP)
+import Data.Char (isAlphaNum)
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import Data.Text (Text, breakOn, takeEnd, toUpper)
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.Format (formatTime)
+import Network.IRC.Conduit (Event(..), Message(..), Source(..))
+import Network.IRC.CTCP (fromCTCP)
 import Network.IRC.Conduit.Lens
-
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
 #else
-import System.Locale    (defaultTimeLocale)
+import System.Locale (defaultTimeLocale)
 #endif
 
 import qualified Data.Text as T

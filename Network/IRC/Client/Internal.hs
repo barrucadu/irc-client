@@ -24,27 +24,27 @@ module Network.IRC.Client.Internal
   , module Network.IRC.Client.Internal.Types
   ) where
 
-import Control.Applicative    ((<$>))
-import Control.Concurrent     (forkIO, killThread, myThreadId, threadDelay, throwTo)
+import Control.Applicative ((<$>))
+import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay, throwTo)
 import Control.Concurrent.STM (STM, atomically, readTVar, writeTVar)
-import Control.Exception      (SomeException, catch, throwIO)
-import Control.Monad          (forM_, unless, void, when)
+import Control.Exception (SomeException, catch, throwIO)
+import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader   (ask, runReaderT)
-import Data.ByteString        (ByteString)
-import Data.Conduit           (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
-import Data.Conduit.TMChan    (closeTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan)
-import Data.IORef             (IORef, newIORef, readIORef, writeIORef)
-import Data.Text              (Text)
-import Data.Text.Encoding     (decodeUtf8, encodeUtf8)
-import Data.Time.Clock        (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
-import Data.Time.Format       (formatTime)
-import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage, Message(..), Source(..), floodProtector, rawMessage, toByteString)
+import Control.Monad.Reader (ask, runReaderT)
+import Data.ByteString (ByteString)
+import Data.Conduit (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
+import Data.Conduit.TMChan (closeTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Text (Text)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
+import Data.Time.Format (formatTime)
+import Network.IRC.Conduit (Event(..), IrcEvent, IrcMessage, Message(..), Source(..), floodProtector, rawMessage, toByteString)
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
 #else
-import System.Locale    (defaultTimeLocale)
+import System.Locale (defaultTimeLocale)
 #endif
 
 import Network.IRC.Client.Internal.Lens
