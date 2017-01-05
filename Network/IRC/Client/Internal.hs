@@ -1,6 +1,7 @@
-{-# LANGUAGE CPP                 #-}
-{-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
@@ -9,7 +10,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : CPP, OverloadedStrings, RankNTypes, ScopedTypeVariables
+-- Portability : CPP, LambdaCase, OverloadedStrings, RankNTypes, ScopedTypeVariables
 --
 -- Most of the hairy code. This isn't all internal, due to messy
 -- dependencies, but I've tried to make this as \"internal\" as
@@ -27,7 +28,7 @@ import Control.Applicative    ((<$>))
 import Control.Concurrent     (forkIO, killThread, myThreadId, threadDelay, throwTo)
 import Control.Concurrent.STM (STM, atomically, readTVar, writeTVar)
 import Control.Exception      (SomeException, catch, throwIO)
-import Control.Monad          (unless, when)
+import Control.Monad          (forM_, unless, void, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader   (ask, runReaderT)
 import Data.ByteString        (ByteString)
@@ -100,7 +101,7 @@ runner = do
   let thePass = get password cconf
 
   -- Initialise the IRC session
-  let initialise = flip runReaderT state . runIrc $ do
+  let initialise = runIrcAction state $ do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
@@ -160,9 +161,12 @@ eventSink lastReceived ircstate = go where
     -- Handle the event.
     let event' = decodeUtf8 <$> event
     ignored <- isIgnored ircstate event'
-    unless ignored $ do
-      hs <- getHandlersFor event' . get handlers <$> snapshot instanceConfig ircstate
-      liftIO $ mapM_ (\h -> forkIO $ runReaderT (runIrc $ h event') ircstate) hs
+    unless ignored . liftIO $ do
+      iconf <- snapshot instanceConfig ircstate
+      forM_ (get handlers iconf) $ \(EventHandler matcher handler) ->
+        maybe (pure ())
+              (void . forkIO . runIrcAction ircstate . handler (_source event'))
+              (matcher event')
 
     -- If disconnected, do not loop.
     disconnected <- liftIO . atomically $ (==Disconnected) <$> getConnectionState ircstate
@@ -179,10 +183,6 @@ isIgnored ircstate ev = do
       User      n ->  (n, Nothing) `elem` ignoreList
       Channel c n -> ((n, Nothing) `elem` ignoreList) || ((n, Just c) `elem` ignoreList)
       Server  _   -> False
-
--- |Get the event handlers for an event.
-getHandlersFor :: Event Text -> [EventHandler s] -> [Event Text -> Irc s ()]
-getHandlersFor e ehs = [_eventFunc eh | eh <- ehs, _eventPred eh e]
 
 -- |A conduit which logs everything which goes through it.
 logConduit :: MonadIO m => (a -> IO ()) -> Conduit a m a
@@ -272,6 +272,10 @@ disconnectNow = do
 
 -------------------------------------------------------------------------------
 -- * Utils
+
+-- | Interact with a client from the outside, by using its 'IrcState'.
+runIrcAction :: MonadIO m => IrcState s -> Irc s a -> m a
+runIrcAction s = liftIO . flip runReaderT s . runIrc
 
 -- | Access the client state.
 getIrcState :: Irc s (IrcState s)

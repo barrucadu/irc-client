@@ -14,11 +14,11 @@
 -- server, all matching handlers are executed concurrently.
 module Network.IRC.Client.Events
   ( -- * Handlers
-    EventHandler
-  , eventHandler
+    EventHandler(..)
   , matchCTCP
   , matchNumeric
   , matchType
+  , matchWhen
 
   -- * Default handlers
   , defaultEventHandlers
@@ -42,7 +42,7 @@ module Network.IRC.Client.Events
   , module Network.IRC.Conduit.Lens
   ) where
 
-import Control.Applicative    ((<$>))
+import Control.Applicative    ((<$>), (<|>))
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char              (isAlphaNum)
@@ -72,27 +72,19 @@ import Network.IRC.Client.Utils
 -------------------------------------------------------------------------------
 -- Handlers
 
--- | An event handler has two parts: a predicate to determine if the
--- handler matches the event, and the function to invoke if so.
-eventHandler
-  :: (Event Text -> Bool)
-  -- ^ Event matching predicate
-  -> (Event Text -> Irc s ())
-  -- ^ Event handler.
-  -> EventHandler s
-eventHandler = EventHandler
-
--- | Match the verb of a CTCP, ignoring case.
+-- | Match the verb of a CTCP, ignoring case, and returning the arguments.
 --
--- > matchCTCP "ping"   ":foo PRIVMSG #bar :\001PING\001"          ==> True
--- > matchCTCP "PING"   ":foo PRIVMSG #bar :\001PING\001"          ==> True
--- > matchCTCP "ACTION" ":foo PRIVMSG #bar :\001ACTION dances\001" ==> True
-matchCTCP :: Text -> Event Text -> Bool
+-- > matchCTCP "ping"   ":foo PRIVMSG #bar :\001PING\001"          ==> Just []
+-- > matchCTCP "PING"   ":foo PRIVMSG #bar :\001PING\001"          ==> Just []
+-- > matchCTCP "ACTION" ":foo PRIVMSG #bar :\001ACTION dances\001" ==> Just ["dances"]
+matchCTCP :: Text -> Event Text -> Maybe [Text]
 matchCTCP verb ev = case _message ev of
   Privmsg _ (Left ctcpbs) ->
-    let (v, _) = fromCTCP ctcpbs
-    in toUpper verb == toUpper v
-  _ -> False
+    let (v, args) = fromCTCP ctcpbs
+    in if toUpper verb == toUpper v
+       then Just args
+       else Nothing
+  _ -> Nothing
 
 -- | Match a numeric server message. Numeric messages are sent in
 -- response to most things, such as connecting to the server, or
@@ -124,18 +116,25 @@ matchCTCP verb ev = case _message ev of
 --
 -- > matchNumeric 001 "001 :Welcome to irc.example.com" ==> True
 -- > matchNumeric 332 "332 :#haskell: We like Haskell"  ==> True
-matchNumeric :: Int -> Event a -> Bool
+matchNumeric :: Int -> Event a -> Maybe [a]
 matchNumeric num ev = case _message ev of
-  Numeric n _ -> num == n
-  _ -> False
+  Numeric n args | num == n -> Just args
+  _ -> Nothing
 
--- | A simple predicate to match events of the given type. Refer to
+-- | Match events of the given type. Refer to
 -- "Network.IRC.Conduit.Lens#Message" for the list of 'Prism''s.
 --
--- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> True
--- > matchType _Quit    ":foo QUIT :goodbye world"       ==> True
-matchType :: Prism' (Message a) b -> Event a -> Bool
-matchType k = is k . _message
+-- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> Just "PRIVMSG :hello world"
+-- > matchType _Quit    ":foo QUIT :goodbye world"       ==> True "QUIT :goodbye world"
+matchType :: Prism' (Message a) b -> Event a -> Maybe (Message a)
+matchType k = matchWhen (is k . _message)
+
+-- | Match a predicate against an event.
+--
+-- > matchWhen (const True) ":foo PRIVMSG #bar :hello world" ==> Just "PRIVMSG :hello world"
+matchWhen :: (Event a -> Bool) -> Event a -> Maybe (Message a)
+matchWhen p ev | p ev = Just (_message ev)
+matchWhen _ _ = Nothing
 
 
 -------------------------------------------------------------------------------
@@ -181,21 +180,19 @@ defaultOnDisconnect = return ()
 
 -- | Respond to server @PING@ messages with a @PONG@.
 pingHandler :: EventHandler s
-pingHandler = eventHandler (matchType _Ping) $ \ev -> case _message ev of
+pingHandler = EventHandler (matchType _Ping) $ \_ msg -> case msg of
   Ping s1 s2 -> send . Pong $ fromMaybe s1 s2
-  _ -> return ()
+  _ -> pure ()
 
 -- | Respond to CTCP @PING@ requests.
 ctcpPingHandler :: EventHandler s
-ctcpPingHandler = eventHandler (matchCTCP "PING") $ \ev -> case (_source ev, _message ev) of
-  (User n, Privmsg _ (Left ctcpbs)) ->
-    let (_, xs) = fromCTCP ctcpbs
-    in send $ ctcpReply n "PING" xs
+ctcpPingHandler = EventHandler (matchCTCP "PING") $ \src args -> case src of
+  User n -> send $ ctcpReply n "PING" args
   _ -> pure ()
 
 -- | Respond to CTCP @VERSION@ requests with the version string.
 ctcpVersionHandler :: EventHandler s
-ctcpVersionHandler = eventHandler (matchCTCP "VERSION") $ \ev -> case _source ev of
+ctcpVersionHandler = EventHandler (matchCTCP "VERSION") $ \src _ -> case src of
   User n -> do
     ver <- get version <$> (snapshot instanceConfig =<< getIrcState)
     send $ ctcpReply n "VERSION" [ver]
@@ -203,7 +200,7 @@ ctcpVersionHandler = eventHandler (matchCTCP "VERSION") $ \ev -> case _source ev
 
 -- | Respond to CTCP @TIME@ requests with the system time.
 ctcpTimeHandler :: EventHandler s
-ctcpTimeHandler = eventHandler (matchCTCP "TIME") $ \ev -> case _source ev of
+ctcpTimeHandler = EventHandler (matchCTCP "TIME") $ \src _ -> case src of
   User n -> do
     now <- liftIO getCurrentTime
     send $ ctcpReply n "TIME" [T.pack $ formatTime defaultTimeLocale "%c" now]
@@ -212,32 +209,29 @@ ctcpTimeHandler = eventHandler (matchCTCP "TIME") $ \ev -> case _source ev of
 -- | Update the nick upon welcome (numeric reply 001), as it may not
 -- be what we requested (eg, in the case of a nick too long).
 welcomeNick :: EventHandler s
-welcomeNick = eventHandler (matchNumeric 001) $ \ev -> case _message ev of
-    Numeric _ xs ->  go xs
-    _ -> pure ()
-  where
-    go (srvNick:_) = do
-      tvarI <- get instanceConfig <$> getIrcState
-      liftIO . atomically $
-        modifyTVar tvarI (set nick srvNick)
-    go _ = pure ()
+welcomeNick = EventHandler (matchNumeric 001) $ \_ args -> case args of
+  (srvNick:_) -> do
+    tvarI <- get instanceConfig <$> getIrcState
+    liftIO . atomically $
+      modifyTVar tvarI (set nick srvNick)
+  [] -> pure ()
 
 -- | Join default channels upon welcome (numeric reply 001). If sent earlier,
 -- the server might reject the JOIN attempts.
 joinOnWelcome :: EventHandler s
-joinOnWelcome = eventHandler (matchNumeric 001) $ \_ -> do
+joinOnWelcome = EventHandler (matchNumeric 001) $ \_ _ -> do
   iconf <- snapshot instanceConfig =<< getIrcState
   mapM_ (send . Join) $ get channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
 -- and 436) when we set it
 nickMangler :: EventHandler s
-nickMangler = eventHandler (\ev -> any (($ev) . matchNumeric) [432, 433, 436]) $ \ev -> case _message ev of
-    Numeric 432 xs -> go fresh xs
-    Numeric 433 xs -> go mangle xs
-    Numeric 436 xs -> go mangle xs
-    _ -> pure ()
+nickMangler = EventHandler (\ev -> matcher 432 fresh ev <|> matcher 433 mangle ev <|> matcher 436 mangle ev) $ \_ -> uncurry go
   where
+    matcher num f ev = case _message ev of
+      Numeric n args | num == n -> Just (f, args)
+      _ -> Nothing
+
     go f (_:srvNick:_) = do
       theNick <- get nick <$> (snapshot instanceConfig =<< getIrcState)
 
@@ -288,29 +282,26 @@ nickMangler = eventHandler (\ev -> any (($ev) . matchNumeric) [432, 433, 436]) $
 -- | Upon joining a channel (numeric reply 331 or 332), add it to the
 -- list (if not already present).
 joinHandler :: EventHandler s
-joinHandler = eventHandler (\ev -> matchNumeric 331 ev || matchNumeric 332 ev) $ \ev -> case _message ev of
-    Numeric _ xs -> go xs
-    _ -> pure ()
-  where
-    go (c:_) = do
-      tvarI <- get instanceConfig <$> getIrcState
-      liftIO . atomically $
-        modifyTVar tvarI $ \iconf ->
-          (if c `elem` get channels iconf
-            then modify channels (c:)
-            else id) iconf
-
-    go _ = pure ()
+joinHandler = EventHandler (\ev -> matchNumeric 331 ev <|> matchNumeric 332 ev) $ \_ args -> case args of
+  (c:_) -> do
+    tvarI <- get instanceConfig <$> getIrcState
+    liftIO . atomically $
+      modifyTVar tvarI $ \iconf ->
+        (if c `elem` get channels iconf
+          then modify channels (c:)
+          else id) iconf
+  _ -> pure ()
 
 -- | Update the channel list upon being kicked.
 kickHandler :: EventHandler s
-kickHandler = eventHandler (matchType _Kick) $ \ev -> do
+kickHandler = EventHandler (matchType _Kick) $ \src msg -> do
   tvarI <- get instanceConfig <$> getIrcState
   liftIO . atomically $ do
     theNick <- get nick <$> readTVar tvarI
-    case (_source ev, _message ev) of
-      (Channel c _, Kick n _ _) | n == theNick -> delChan tvarI c
-                                | otherwise    -> pure ()
+    case (src, msg) of
+      (Channel c _, Kick n _ _)
+        | n == theNick -> delChan tvarI c
+        | otherwise    -> pure ()
       _ -> pure ()
 
 

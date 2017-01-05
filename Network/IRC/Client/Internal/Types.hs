@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
@@ -9,7 +10,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : FlexibleInstances, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RankNTypes
+-- Portability : FlexibleInstances, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RankNTypes
 --
 -- Internal types. Most of these are re-exported elsewhere as lenses.
 --
@@ -18,16 +19,16 @@
 module Network.IRC.Client.Internal.Types where
 
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
-import Control.Exception      (Exception)
+import Control.Exception (Exception)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader   (MonadReader, ReaderT, asks)
-import Control.Monad.State    (MonadState(..))
-import Data.ByteString        (ByteString)
-import Data.Conduit           (Consumer, Producer)
-import Data.Conduit.TMChan    (TBMChan)
-import Data.Text              (Text)
-import Data.Time.Clock        (NominalDiffTime)
-import Network.IRC.Conduit    (Event(..), IrcEvent, IrcMessage)
+import Control.Monad.Reader (MonadReader, ReaderT, asks)
+import Control.Monad.State (MonadState(..))
+import Data.ByteString (ByteString)
+import Data.Conduit (Consumer, Producer)
+import Data.Conduit.TMChan (TBMChan)
+import Data.Text (Text)
+import Data.Time.Clock (NominalDiffTime)
+import Network.IRC.Conduit (Event(..), Source, IrcEvent, IrcMessage)
 
 
 -------------------------------------------------------------------------------
@@ -129,12 +130,13 @@ data Origin = FromServer | FromClient
 -- * Events
 
 -- | A function which handles an event.
-data EventHandler s = EventHandler
-  { _eventPred :: Event Text -> Bool
-  -- ^ The predicate to match on.
-  , _eventFunc :: Event Text -> Irc s ()
-  -- ^ The function to call.
-  }
+data EventHandler s where
+  EventHandler
+    :: (Event Text -> Maybe b)
+    -- ^ Predicate to determine if the event should be handled.
+    -> (Source Text -> b -> Irc s ())
+    -- ^ Actual event handling function.
+    -> EventHandler s
 
 
 -------------------------------------------------------------------------------

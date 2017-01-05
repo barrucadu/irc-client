@@ -16,7 +16,6 @@ import Data.ByteString (ByteString)
 import Data.Profunctor (Choice (right'), Profunctor (dimap))
 import Data.Text (Text)
 import Data.Time (NominalDiffTime)
-import Network.IRC.Conduit
 
 import Network.IRC.Client.Internal.Lens
 import Network.IRC.Client.Internal.Types
@@ -78,13 +77,6 @@ LENS((InstanceConfig s),channels,[Text])
 LENS((InstanceConfig s),version,Text)
 LENS((InstanceConfig s),handlers,[EventHandler s])
 LENS((InstanceConfig s),ignore,[(Text, Maybe Text)])
-
-
--------------------------------------------------------------------------------
--- * Lenses for 'EventHandler'
-
-LENS((EventHandler s),eventPred,(Event Text -> Bool))
-LENS((EventHandler s),eventFunc,(Event Text -> Irc s ()))
 
 
 -------------------------------------------------------------------------------

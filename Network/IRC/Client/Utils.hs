@@ -18,6 +18,7 @@ module Network.IRC.Client.Utils
     -- * Events
   , addHandler
   , reply
+  , replyTo
 
     -- * CTCPs
   , ctcp
@@ -92,10 +93,13 @@ addHandler handler = do
 
 -- | Send a message to the source of an event.
 reply :: Event Text -> Text -> Irc s ()
-reply ev txt = case _source ev of
-  Channel c _ -> mapM_ (send . Privmsg c . Right) $ T.lines txt
-  User n      -> mapM_ (send . Privmsg n . Right) $ T.lines txt
-  _           -> return ()
+reply = replyTo . _source
+
+-- | Send a message to the source of an event.
+replyTo :: Source Text -> Text -> Irc s ()
+replyTo (Channel c _) = mapM_ (send . Privmsg c . Right) . T.lines
+replyTo (User n)      = mapM_ (send . Privmsg n . Right) . T.lines
+replyTo _ = const $ pure ()
 
 
 -------------------------------------------------------------------------------

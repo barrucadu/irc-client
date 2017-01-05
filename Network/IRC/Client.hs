@@ -154,7 +154,6 @@ module Network.IRC.Client
 
 import Control.Concurrent.STM (newTVarIO)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Trans.Reader (runReaderT)
 import Data.ByteString (ByteString)
 import qualified Data.Conduit.Network.TLS as TLS
 import Data.Conduit.TMChan (newTBMChanIO)
@@ -264,10 +263,6 @@ runClient cconf iconf ustate = newIrcState cconf iconf ustate >>= runClientWith
 -- interact with the client from the outside.
 runClientWith :: MonadIO m => IrcState s -> m ()
 runClientWith = flip runIrcAction runner
-
--- | Interact with a client from the outside, by using its 'IrcState'.
-runIrcAction :: MonadIO m => IrcState s -> Irc s a -> m a
-runIrcAction s = liftIO . flip runReaderT s . runIrc
 
 
 -------------------------------------------------------------------------------
