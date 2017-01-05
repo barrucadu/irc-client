@@ -50,14 +50,17 @@ type Prism' s a = Prism s s a a
 -- * Utilities
 
 -- | Get a value from a lens.
+{-# INLINE get #-}
 get :: Getting a s a -> s -> a
 get lens = getConst . lens Const
 
 -- | Set a value in a lens.
+{-# INLINE set #-}
 set :: Lens' s a -> a -> s -> s
 set lens a = runIdentity . lens (\_ -> Identity a)
 
 -- | Modify a value in a lens.
+{-# INLINE modify #-}
 modify :: Lens' s a -> (a -> a) -> s -> s
 modify lens f s = let a = get lens s in set lens (f a) s
 
