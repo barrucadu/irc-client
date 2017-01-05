@@ -123,10 +123,10 @@ matchNumeric num ev = case _message ev of
 -- | Match events of the given type. Refer to
 -- "Network.IRC.Conduit.Lens#Message" for the list of 'Prism''s.
 --
--- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> Just "PRIVMSG :hello world"
--- > matchType _Quit    ":foo QUIT :goodbye world"       ==> True "QUIT :goodbye world"
-matchType :: Prism' (Message a) b -> Event a -> Maybe (Message a)
-matchType k = matchWhen (is k . _message)
+-- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> Just "hello world"
+-- > matchType _Quit    ":foo QUIT :goodbye world"       ==> Just "goodbye world"
+matchType :: Prism' (Message a) b -> Event a -> Maybe b
+matchType k = preview k . _message
 
 -- | Match a predicate against an event.
 --
@@ -179,9 +179,8 @@ defaultOnDisconnect = return ()
 
 -- | Respond to server @PING@ messages with a @PONG@.
 pingHandler :: EventHandler s
-pingHandler = EventHandler (matchType _Ping) $ \_ msg -> case msg of
-  Ping s1 s2 -> send . Pong $ fromMaybe s1 s2
-  _ -> pure ()
+pingHandler = EventHandler (matchType _Ping) $ \_ (s1, s2) ->
+  send . Pong $ fromMaybe s1 s2
 
 -- | Respond to CTCP @PING@ requests.
 ctcpPingHandler :: EventHandler s
@@ -293,12 +292,12 @@ joinHandler = EventHandler (\ev -> matchNumeric 331 ev <|> matchNumeric 332 ev) 
 
 -- | Update the channel list upon being kicked.
 kickHandler :: EventHandler s
-kickHandler = EventHandler (matchType _Kick) $ \src msg -> do
+kickHandler = EventHandler (matchType _Kick) $ \src (n, _, _) -> do
   tvarI <- get instanceConfig <$> getIrcState
   liftIO . atomically $ do
     theNick <- get nick <$> readTVar tvarI
-    case (src, msg) of
-      (Channel c _, Kick n _ _)
+    case src of
+      Channel c _
         | n == theNick -> delChan tvarI c
         | otherwise    -> pure ()
       _ -> pure ()
