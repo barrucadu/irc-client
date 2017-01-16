@@ -27,7 +27,7 @@ module Network.IRC.Client.Internal
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay, throwTo)
 import Control.Concurrent.STM (STM, atomically, readTVar, writeTVar)
-import Control.Exception (SomeException, catch, throwIO)
+import Control.Exception (SomeException, catch)
 import Control.Monad (forM_, unless, void, when)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ask, runReaderT)
@@ -62,7 +62,7 @@ setupInternal
   -- ^ Function to start the network conduits.
   -> Irc s ()
   -- ^ Connect handler
-  -> Irc s ()
+  -> (Maybe SomeException -> Irc s ())
   -- ^ Disconnect handler
   -> (Origin -> ByteString -> IO ())
   -- ^ Logging function
@@ -138,10 +138,7 @@ runner = do
     (pure . Just)
 
   disconnect
-  _ondisconnect cconf
-
-  -- If the connection terminated due to an exception, rethrow it.
-  liftIO $ maybe (pure ()) throwIO exc
+  _ondisconnect cconf exc
 
 -- | Forget failed decodings.
 forgetful :: Monad m => Conduit (Either a b) m b

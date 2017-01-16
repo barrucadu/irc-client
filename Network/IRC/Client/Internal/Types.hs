@@ -19,7 +19,7 @@
 module Network.IRC.Client.Internal.Types where
 
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
-import Control.Exception (Exception)
+import Control.Exception (Exception, SomeException)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, asks)
 import Control.Monad.State (MonadState(..))
@@ -91,10 +91,12 @@ data ConnectionConfig s = ConnectionConfig
   , _onconnect  :: Irc s ()
   -- ^ Action to run after sending the @PASS@ and @USER@ commands to the
   -- server. The default behaviour is to send the @NICK@ command.
-  , _ondisconnect :: Irc s ()
-  -- ^ Action to run after disconnecting from the server, both by local
-  -- choice and by losing the connection. This is run after tearing down the
-  -- connection. The default behaviour is to do nothing.
+  , _ondisconnect :: Maybe SomeException -> Irc s ()
+  -- ^ Action to run after disconnecting from the server, both by
+  -- local choice and by losing the connection. This is run after
+  -- tearing down the connection. If the connection terminated due to
+  -- an exception, it is given. The default behaviour is to rethrow
+  -- the exception.
   , _logfunc    :: Origin -> ByteString -> IO ()
   -- ^ Function to log messages sent to and received from the server.
   }

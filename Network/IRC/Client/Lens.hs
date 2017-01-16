@@ -12,6 +12,7 @@
 module Network.IRC.Client.Lens where
 
 import Control.Concurrent.STM (TVar)
+import Control.Exception (SomeException)
 import Data.ByteString (ByteString)
 import Data.Profunctor (Choice (right'), Profunctor (dimap))
 import Data.Text (Text)
@@ -65,7 +66,7 @@ LENS((ConnectionConfig s),password,(Maybe Text))
 LENS((ConnectionConfig s),flood,NominalDiffTime)
 LENS((ConnectionConfig s),timeout,NominalDiffTime)
 LENS((ConnectionConfig s),onconnect,(Irc s ()))
-LENS((ConnectionConfig s),ondisconnect,(Irc s ()))
+LENS((ConnectionConfig s),ondisconnect,(Maybe SomeException -> Irc s ()))
 LENS((ConnectionConfig s),logfunc,(Origin -> ByteString -> IO ()))
 
 
