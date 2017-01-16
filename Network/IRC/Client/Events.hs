@@ -44,7 +44,7 @@ module Network.IRC.Client.Events
 
 import Control.Applicative ((<$>), (<|>))
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
-import Control.Exception (SomeException, throwIO)
+import Control.Monad.Catch (SomeException, throwM)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (isAlphaNum)
 import Data.Maybe (fromMaybe)
@@ -172,7 +172,7 @@ defaultOnConnect = do
 -- | The default disconnect handler: rethrow the exception, if there
 -- is any. You might want to override this with one which reconnects.
 defaultOnDisconnect :: Maybe SomeException -> Irc s ()
-defaultOnDisconnect = liftIO . maybe (pure ()) throwIO
+defaultOnDisconnect = maybe (pure ()) throwM
 
 
 -------------------------------------------------------------------------------

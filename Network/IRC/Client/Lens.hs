@@ -12,7 +12,7 @@
 module Network.IRC.Client.Lens where
 
 import Control.Concurrent.STM (TVar)
-import Control.Exception (SomeException)
+import Control.Monad.Catch (SomeException)
 import Data.ByteString (ByteString)
 import Data.Profunctor (Choice (right'), Profunctor (dimap))
 import Data.Text (Text)

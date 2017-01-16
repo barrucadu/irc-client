@@ -19,7 +19,7 @@
 module Network.IRC.Client.Internal.Types where
 
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
-import Control.Exception (Exception, SomeException)
+import Control.Monad.Catch (Exception, MonadThrow, MonadCatch, MonadMask, SomeException)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, asks)
 import Control.Monad.State (MonadState(..))
@@ -36,7 +36,7 @@ import Network.IRC.Conduit (Event(..), Source, IrcEvent, IrcMessage)
 
 -- | The IRC monad.
 newtype Irc s a = Irc { runIrc :: ReaderT (IrcState s) IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IrcState s))
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IrcState s), MonadThrow, MonadCatch, MonadMask)
 
 instance MonadState s (Irc s) where
   state f = do
