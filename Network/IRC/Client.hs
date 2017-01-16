@@ -14,7 +14,7 @@
 -- > run host port nick = do
 -- >   let conn = plainConnection host port
 -- >   let cfg  = defaultInstanceConfig nick & handlers %~ (yourCustomEventHandlers:)
--- >   start conn cfg
+-- >   runClient conn cfg ()
 --
 -- You shouldn't really need to tweak anything other than the event
 -- handlers, as everything has been designed to be as simple as
