@@ -135,9 +135,7 @@ data Origin = FromServer | FromClient
 data EventHandler s where
   EventHandler
     :: (Event Text -> Maybe b)
-    -- ^ Predicate to determine if the event should be handled.
     -> (Source Text -> b -> Irc s ())
-    -- ^ Actual event handling function.
     -> EventHandler s
 
 
