@@ -44,7 +44,7 @@ module Network.IRC.Client.Events
 
 import Control.Applicative ((<$>), (<|>))
 import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
-import Control.Monad.Catch (SomeException, throwM)
+import Control.Monad.Catch (SomeException, fromException, throwM)
 import Control.Monad.IO.Class (liftIO)
 import Data.Char (isAlphaNum)
 import Data.Maybe (fromMaybe)
@@ -169,10 +169,18 @@ defaultOnConnect = do
   iconf <- snapshot instanceConfig =<< getIrcState
   send . Nick $ get nick iconf
 
--- | The default disconnect handler: rethrow the exception, if there
--- is any. You might want to override this with one which reconnects.
+-- | The default disconnect handler
+--
+--    - If the client disconnected due to a 'Timeout' exception, reconnect.
+--
+--    - If the client disconnected due to another exception, rethrow it.
+--
+--    - If the client disconnected without an exception, halt.
 defaultOnDisconnect :: Maybe SomeException -> Irc s ()
-defaultOnDisconnect = maybe (pure ()) throwM
+defaultOnDisconnect (Just exc) = case fromException exc of
+  Just Timeout -> reconnect
+  Nothing -> throwM exc
+defaultOnDisconnect Nothing = pure ()
 
 
 -------------------------------------------------------------------------------

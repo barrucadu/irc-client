@@ -95,8 +95,8 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ Action to run after disconnecting from the server, both by
   -- local choice and by losing the connection. This is run after
   -- tearing down the connection. If the connection terminated due to
-  -- an exception, it is given. The default behaviour is to rethrow
-  -- the exception.
+  -- an exception, it is given. The default behaviour is to reconnect
+  -- if a timeout, otherwise rethrow any exception.
   , _logfunc    :: Origin -> ByteString -> IO ()
   -- ^ Function to log messages sent to and received from the server.
   }
