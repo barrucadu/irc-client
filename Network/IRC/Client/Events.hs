@@ -164,9 +164,9 @@ defaultEventHandlers =
   ]
 
 -- | The default connect handler: set the nick.
-defaultOnConnect :: Irc s ()
+defaultOnConnect :: IRC s ()
 defaultOnConnect = do
-  iconf <- snapshot instanceConfig =<< getIrcState
+  iconf <- snapshot instanceConfig =<< getIRCState
   send . Nick $ get nick iconf
 
 -- | The default disconnect handler
@@ -176,7 +176,7 @@ defaultOnConnect = do
 --    - If the client disconnected due to another exception, rethrow it.
 --
 --    - If the client disconnected without an exception, halt.
-defaultOnDisconnect :: Maybe SomeException -> Irc s ()
+defaultOnDisconnect :: Maybe SomeException -> IRC s ()
 defaultOnDisconnect (Just exc) = case fromException exc of
   Just Timeout -> reconnect
   Nothing -> throwM exc
@@ -201,7 +201,7 @@ ctcpPingHandler = EventHandler (matchCTCP "PING") $ \src args -> case src of
 ctcpVersionHandler :: EventHandler s
 ctcpVersionHandler = EventHandler (matchCTCP "VERSION") $ \src _ -> case src of
   User n -> do
-    ver <- get version <$> (snapshot instanceConfig =<< getIrcState)
+    ver <- get version <$> (snapshot instanceConfig =<< getIRCState)
     send $ ctcpReply n "VERSION" [ver]
   _ -> pure ()
 
@@ -218,7 +218,7 @@ ctcpTimeHandler = EventHandler (matchCTCP "TIME") $ \src _ -> case src of
 welcomeNick :: EventHandler s
 welcomeNick = EventHandler (matchNumeric 001) $ \_ args -> case args of
   (srvNick:_) -> do
-    tvarI <- get instanceConfig <$> getIrcState
+    tvarI <- get instanceConfig <$> getIRCState
     liftIO . atomically $
       modifyTVar tvarI (set nick srvNick)
   [] -> pure ()
@@ -227,7 +227,7 @@ welcomeNick = EventHandler (matchNumeric 001) $ \_ args -> case args of
 -- the server might reject the JOIN attempts.
 joinOnWelcome :: EventHandler s
 joinOnWelcome = EventHandler (matchNumeric 001) $ \_ _ -> do
-  iconf <- snapshot instanceConfig =<< getIrcState
+  iconf <- snapshot instanceConfig =<< getIRCState
   mapM_ (send . Join) $ get channels iconf
 
 -- | Mangle the nick if there's a collision (numeric replies 432, 433,
@@ -240,7 +240,7 @@ nickMangler = EventHandler (\ev -> matcher 432 fresh ev <|> matcher 433 mangle e
       _ -> Nothing
 
     go f (_:srvNick:_) = do
-      theNick <- get nick <$> (snapshot instanceConfig =<< getIrcState)
+      theNick <- get nick <$> (snapshot instanceConfig =<< getIRCState)
 
       -- If the length of our nick and the server's idea of our nick
       -- differ, it was truncated - so calculate the allowable length.
@@ -291,7 +291,7 @@ nickMangler = EventHandler (\ev -> matcher 432 fresh ev <|> matcher 433 mangle e
 joinHandler :: EventHandler s
 joinHandler = EventHandler (\ev -> matchNumeric 331 ev <|> matchNumeric 332 ev) $ \_ args -> case args of
   (c:_) -> do
-    tvarI <- get instanceConfig <$> getIrcState
+    tvarI <- get instanceConfig <$> getIRCState
     liftIO . atomically $
       modifyTVar tvarI $ \iconf ->
         (if c `elem` get channels iconf
@@ -302,7 +302,7 @@ joinHandler = EventHandler (\ev -> matchNumeric 331 ev <|> matchNumeric 332 ev) 
 -- | Update the channel list upon being kicked.
 kickHandler :: EventHandler s
 kickHandler = EventHandler (matchType _Kick) $ \src (n, _, _) -> do
-  tvarI <- get instanceConfig <$> getIrcState
+  tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $ do
     theNick <- get nick <$> readTVar tvarI
     case src of

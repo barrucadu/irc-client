@@ -105,9 +105,9 @@ module Network.IRC.Client
 
   -- | With this library, IRC clients are mostly composed of event
   -- handlers. Event handlers are monadic actions operating in the
-  -- 'Irc' monad.
+  -- 'IRC' monad.
 
-  , Irc
+  , IRC
   , send
   , sendBS
   , disconnect
@@ -120,24 +120,24 @@ module Network.IRC.Client
   -- ** From the outside
 
   -- | The 'ConnectionConfig', 'InstanceConfig', and some other stuff
-  -- are combined in the 'IrcState' type. This can be used to interact
-  -- with a client from the outside, by providing a way to run @Irc s
+  -- are combined in the 'IRCState' type. This can be used to interact
+  -- with a client from the outside, by providing a way to run @IRC s
   -- a@ actions.
 
-  , IrcState
-  , getIrcState
-  , runIrcAction
+  , IRCState
+  , getIRCState
+  , runIRCAction
   , ConnectionState(..)
   , getConnectionState
 
   -- * Execution
   , runClient
 
-  -- | If an 'IrcState' is constructed with 'newIrcState' and a client
-  -- started with 'runClientWith', then 'runIrcAction' can be used to
+  -- | If an 'IRCState' is constructed with 'newIRCState' and a client
+  -- started with 'runClientWith', then 'runIRCAction' can be used to
   -- interact with that client.
 
-  , newIrcState
+  , newIRCState
   , runClientWith
 
   -- | If the client times out from the server, the 'Timeout'
@@ -254,35 +254,35 @@ runClient :: MonadIO m
   -> s
   -- ^ The initial value for the user state.
   -> m ()
-runClient cconf iconf ustate = newIrcState cconf iconf ustate >>= runClientWith
+runClient cconf iconf ustate = newIRCState cconf iconf ustate >>= runClientWith
 
 -- | Like 'runClient', but use the provided initial
--- 'IrcState'.
+-- 'IRCState'.
 --
--- Multiple clients should not be run with the same 'IrcState'. The
--- utility of this is to be able to run @Irc s a@ actions in order to
+-- Multiple clients should not be run with the same 'IRCState'. The
+-- utility of this is to be able to run @IRC s a@ actions in order to
 -- interact with the client from the outside.
-runClientWith :: MonadIO m => IrcState s -> m ()
-runClientWith = flip runIrcAction runner
+runClientWith :: MonadIO m => IRCState s -> m ()
+runClientWith = flip runIRCAction runner
 
 
 -------------------------------------------------------------------------------
 -- State
 
 -- | Construct a new IRC state
-newIrcState :: MonadIO m
+newIRCState :: MonadIO m
   => ConnectionConfig s
   -> InstanceConfig s
   -> s
   -- ^ The initial value for the user state.
-  -> m (IrcState s)
-newIrcState cconf iconf ustate = liftIO $ do
+  -> m (IRCState s)
+newIRCState cconf iconf ustate = liftIO $ do
   ustvar <- newTVarIO ustate
   ictvar <- newTVarIO iconf
   cstvar <- newTVarIO Disconnected
   squeue <- newTVarIO =<< newTBMChanIO 16
 
-  pure IrcState
+  pure IRCState
     { _connectionConfig = cconf
     , _userState        = ustvar
     , _instanceConfig   = ictvar

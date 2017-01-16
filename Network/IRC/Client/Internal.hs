@@ -39,7 +39,7 @@ import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (formatTime)
-import Network.IRC.Conduit (Event(..), IrcEvent, IrcMessage, Message(..), Source(..), floodProtector, rawMessage, toByteString)
+import Network.IRC.Conduit (Event(..), Message(..), Source(..), floodProtector, rawMessage, toByteString)
 
 #if MIN_VERSION_time(1,5,0)
 import Data.Time.Format (defaultTimeLocale)
@@ -58,11 +58,11 @@ import Network.IRC.Client.Lens
 -- | Config to connect to a server using the supplied connection
 -- function.
 setupInternal
-  :: (IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ())
+  :: (IO () -> Consumer (Either ByteString (Event ByteString)) IO () -> Producer IO (Message ByteString) -> IO ())
   -- ^ Function to start the network conduits.
-  -> Irc s ()
+  -> IRC s ()
   -- ^ Connect handler
-  -> (Maybe SomeException -> Irc s ())
+  -> (Maybe SomeException -> IRC s ())
   -- ^ Disconnect handler
   -> (Origin -> ByteString -> IO ())
   -- ^ Logging function
@@ -90,9 +90,9 @@ setupInternal f oncon ondis logf host port_ = ConnectionConfig
 -- * Event loop
 
 -- | The event loop.
-runner :: Irc s ()
+runner :: IRC s ()
 runner = do
-  state <- getIrcState
+  state <- getIRCState
   let cconf = _connectionConfig state
 
   -- Set the real- and user-name
@@ -101,7 +101,7 @@ runner = do
   let thePass = get password cconf
 
   -- Initialise the IRC session
-  let initialise = runIrcAction state $ do
+  let initialise = runIRCAction state $ do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
@@ -150,7 +150,7 @@ forgetful = awaitForever go where
 
 -- | Block on receiving a message and invoke all matching handlers
 -- concurrently.
-eventSink :: MonadIO m => IORef UTCTime -> IrcState s -> Consumer IrcEvent m ()
+eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> Consumer (Event ByteString) m ()
 eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
     -- Record the current time.
@@ -164,7 +164,7 @@ eventSink lastReceived ircstate = go where
       iconf <- snapshot instanceConfig ircstate
       forM_ (get handlers iconf) $ \(EventHandler matcher handler) ->
         maybe (pure ())
-              (void . forkIO . runIrcAction ircstate . handler (_source event'))
+              (void . forkIO . runIRCAction ircstate . handler (_source event'))
               (matcher event')
 
     -- If disconnected, do not loop.
@@ -172,7 +172,7 @@ eventSink lastReceived ircstate = go where
     unless disconnected go)
 
 -- | Check if an event is ignored or not.
-isIgnored :: MonadIO m => IrcState s -> Event Text -> m Bool
+isIgnored :: MonadIO m => IRCState s -> Event Text -> m Bool
 isIgnored ircstate ev = do
   iconf <- liftIO . readTVarIO . _instanceConfig $ ircstate
   let ignoreList = _ignore iconf
@@ -225,14 +225,14 @@ noopLogger _ _ = return ()
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
-send :: Message Text -> Irc s ()
+send :: Message Text -> IRC s ()
 send = sendBS . fmap encodeUtf8
 
 -- | Send a message, using TLS if enabled. This blocks if messages are
 -- sent too rapidly.
-sendBS :: IrcMessage -> Irc s ()
+sendBS :: Message ByteString -> IRC s ()
 sendBS msg = do
-  qv <- _sendqueue <$> getIrcState
+  qv <- _sendqueue <$> getIRCState
   liftIO . atomically $ flip writeTBMChan msg =<< readTVar qv
 
 
@@ -241,9 +241,9 @@ sendBS msg = do
 
 -- | Disconnect from the server, properly tearing down the TLS session
 -- (if there is one).
-disconnect :: Irc s ()
+disconnect :: IRC s ()
 disconnect = do
-  s <- getIrcState
+  s <- getIRCState
 
   liftIO $ do
     connState <- readTVarIO (_connectionState s)
@@ -274,12 +274,12 @@ disconnect = do
 --
 -- Like 'runClient' and 'runClientWith', this will not return until
 -- the client terminates (ie, disconnects without reconnecting).
-reconnect :: Irc s ()
+reconnect :: IRC s ()
 reconnect = do
   disconnect
 
   -- create a new send queue
-  s <- getIrcState
+  s <- getIRCState
   liftIO . atomically $
     writeTVar (_sendqueue s) =<< newTBMChan 16
 
@@ -289,16 +289,16 @@ reconnect = do
 -------------------------------------------------------------------------------
 -- * Utils
 
--- | Interact with a client from the outside, by using its 'IrcState'.
-runIrcAction :: MonadIO m => IrcState s -> Irc s a -> m a
-runIrcAction s = liftIO . flip runReaderT s . runIrc
+-- | Interact with a client from the outside, by using its 'IRCState'.
+runIRCAction :: MonadIO m => IRCState s -> IRC s a -> m a
+runIRCAction s = liftIO . flip runReaderT s . runIRC
 
 -- | Access the client state.
-getIrcState :: Irc s (IrcState s)
-getIrcState = ask
+getIRCState :: IRC s (IRCState s)
+getIRCState = ask
 
 -- | Get the connection state from an IRC state.
-getConnectionState :: IrcState s -> STM ConnectionState
+getConnectionState :: IRCState s -> STM ConnectionState
 getConnectionState = readTVar . _connectionState
 
 -- | Block until an action is successful or a timeout is reached.

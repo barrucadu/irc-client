@@ -49,10 +49,10 @@ import Network.IRC.Client.Internal.Types
 -------------------------------------------------------------------------------
 -- * Lenses for 'IRCState'
 
-GETTER((IrcState s),connectionConfig,(ConnectionConfig s))
-LENS((IrcState s),userState,(TVar s))
-LENS((IrcState s),instanceConfig,(TVar (InstanceConfig s)))
-LENS((IrcState s),connectionState,(TVar ConnectionState))
+GETTER((IRCState s),connectionConfig,(ConnectionConfig s))
+LENS((IRCState s),userState,(TVar s))
+LENS((IRCState s),instanceConfig,(TVar (InstanceConfig s)))
+LENS((IRCState s),connectionState,(TVar ConnectionState))
 
 
 -------------------------------------------------------------------------------
@@ -65,8 +65,8 @@ LENS((ConnectionConfig s),realname,Text)
 LENS((ConnectionConfig s),password,(Maybe Text))
 LENS((ConnectionConfig s),flood,NominalDiffTime)
 LENS((ConnectionConfig s),timeout,NominalDiffTime)
-LENS((ConnectionConfig s),onconnect,(Irc s ()))
-LENS((ConnectionConfig s),ondisconnect,(Maybe SomeException -> Irc s ()))
+LENS((ConnectionConfig s),onconnect,(IRC s ()))
+LENS((ConnectionConfig s),ondisconnect,(Maybe SomeException -> IRC s ()))
 LENS((ConnectionConfig s),logfunc,(Origin -> ByteString -> IO ()))
 
 

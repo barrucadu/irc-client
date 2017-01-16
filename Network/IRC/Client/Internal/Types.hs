@@ -28,17 +28,17 @@ import Data.Conduit (Consumer, Producer)
 import Data.Conduit.TMChan (TBMChan)
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
-import Network.IRC.Conduit (Event(..), Source, IrcEvent, IrcMessage)
+import Network.IRC.Conduit (Event(..), Message, Source)
 
 
 -------------------------------------------------------------------------------
 -- * The IRC monad
 
 -- | The IRC monad.
-newtype Irc s a = Irc { runIrc :: ReaderT (IrcState s) IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IrcState s), MonadThrow, MonadCatch, MonadMask)
+newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IRCState s), MonadThrow, MonadCatch, MonadMask)
 
-instance MonadState s (Irc s) where
+instance MonadState s (IRC s) where
   state f = do
     tvar <- asks _userState
     liftIO . atomically $ do
@@ -56,13 +56,13 @@ instance MonadState s (Irc s) where
 -- * State
 
 -- | The state of an IRC session.
-data IrcState s = IrcState { _connectionConfig :: ConnectionConfig s
+data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
                            -- ^Read-only connection configuration
                            , _userState        :: TVar s
                            -- ^Mutable user state
                            , _instanceConfig   :: TVar (InstanceConfig s)
                            -- ^Mutable instance configuration in STM
-                           , _sendqueue        :: TVar (TBMChan IrcMessage)
+                           , _sendqueue        :: TVar (TBMChan (Message ByteString))
                            -- ^ Message send queue.
                            , _connectionState  :: TVar ConnectionState
                            -- ^State of the connection.
@@ -70,7 +70,7 @@ data IrcState s = IrcState { _connectionConfig :: ConnectionConfig s
 
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
-  { _func       :: IO () -> Consumer (Either ByteString IrcEvent) IO () -> Producer IO IrcMessage -> IO ()
+  { _func       :: IO () -> Consumer (Either ByteString (Event ByteString)) IO () -> Producer IO (Message ByteString) -> IO ()
   -- ^ Function to connect and start the conduits.
   , _server     :: ByteString
   -- ^ The server host.
@@ -88,10 +88,10 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ The maximum time between received messages from the server. If no
   -- messages arrive from the server for this period, the client is sent
   -- a 'Timeout' exception and disconnects.
-  , _onconnect  :: Irc s ()
+  , _onconnect  :: IRC s ()
   -- ^ Action to run after sending the @PASS@ and @USER@ commands to the
   -- server. The default behaviour is to send the @NICK@ command.
-  , _ondisconnect :: Maybe SomeException -> Irc s ()
+  , _ondisconnect :: Maybe SomeException -> IRC s ()
   -- ^ Action to run after disconnecting from the server, both by
   -- local choice and by losing the connection. This is run after
   -- tearing down the connection. If the connection terminated due to
@@ -135,7 +135,7 @@ data Origin = FromServer | FromClient
 data EventHandler s where
   EventHandler
     :: (Event Text -> Maybe b)
-    -> (Source Text -> b -> Irc s ())
+    -> (Source Text -> b -> IRC s ())
     -> EventHandler s
 
 
