@@ -26,14 +26,14 @@ module Network.IRC.Client.Internal
 
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay, throwTo)
-import Control.Concurrent.STM (STM, atomically, readTVar, writeTVar)
+import Control.Concurrent.STM (STM, atomically, readTVar, readTVarIO, writeTVar)
 import Control.Monad (forM_, unless, void, when)
 import Control.Monad.Catch (SomeException, catch)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ask, runReaderT)
 import Data.ByteString (ByteString)
 import Data.Conduit (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
-import Data.Conduit.TMChan (closeTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan)
+import Data.Conduit.TMChan (closeTBMChan, isClosedTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan, newTBMChan)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -114,7 +114,9 @@ runner = do
   -- An IORef to keep track of the time of the last received message, to allow a local timeout.
   lastReceived <- liftIO $ newIORef =<< getCurrentTime
 
-  let source = toProducer $ sourceTBMChan (_sendqueue state)
+  squeue <- liftIO . readTVarIO $ _sendqueue state
+
+  let source = toProducer $ sourceTBMChan squeue
                           $= antiflood
                           $= logConduit (_logfunc cconf FromClient . toByteString)
   let sink   = forgetful =$= logConduit (_logfunc cconf FromServer . _raw)
@@ -172,7 +174,7 @@ eventSink lastReceived ircstate = go where
 -- | Check if an event is ignored or not.
 isIgnored :: MonadIO m => IrcState s -> Event Text -> m Bool
 isIgnored ircstate ev = do
-  iconf <- liftIO . atomically . readTVar . _instanceConfig $ ircstate
+  iconf <- liftIO . readTVarIO . _instanceConfig $ ircstate
   let ignoreList = _ignore iconf
 
   return $
@@ -230,8 +232,8 @@ send = sendBS . fmap encodeUtf8
 -- sent too rapidly.
 sendBS :: IrcMessage -> Irc s ()
 sendBS msg = do
-  queue <- _sendqueue <$> getIrcState
-  liftIO . atomically $ writeTBMChan queue msg
+  qv <- _sendqueue <$> getIrcState
+  liftIO . atomically $ flip writeTBMChan msg =<< readTVar qv
 
 
 -------------------------------------------------------------------------------
@@ -243,28 +245,45 @@ disconnect :: Irc s ()
 disconnect = do
   s <- getIrcState
 
-  connState <- liftIO . atomically . readTVar $ _connectionState s
-  case connState of
-    Connected -> do
-      -- Set the state to @Disconnecting@
-      liftIO . atomically $ writeTVar (_connectionState s) Disconnecting
+  liftIO $ do
+    connState <- readTVarIO (_connectionState s)
+    case connState of
+      Connected -> do
+        -- Set the state to @Disconnecting@
+        atomically $ writeTVar (_connectionState s) Disconnecting
 
-      -- Wait for all messages to be sent, or a minute has passed.
-      timeoutBlock 60 . atomically $ isEmptyTBMChan (_sendqueue s)
+        -- Wait for all messages to be sent, or a minute has passed.
+        timeoutBlock 60 . atomically $ do
+          queue <- readTVar (_sendqueue s)
+          (||) <$> isEmptyTBMChan queue <*> isClosedTBMChan queue
 
-      -- Then close the connection
-      disconnectNow
+        -- Close the chan, which closes the sending conduit, and set
+        -- the state to @Disconnected@.
+        atomically $ do
+          closeTBMChan =<< readTVar (_sendqueue s)
+          writeTVar (_connectionState s) Disconnected
 
-    -- If already disconnected, or disconnecting, do nothing.
-    _ -> pure ()
+      -- If already disconnected, or disconnecting, do nothing.
+      _ -> pure ()
 
--- | Disconnect immediately, without waiting for messages to be sent.
-disconnectNow :: Irc s ()
-disconnectNow = do
+-- | Disconnect from the server (this will wait for all messages to be
+-- sent, or a minute to pass), and then connect again.
+--
+-- This can be called after the client has already disconnected, in
+-- which case it will just connect again.
+--
+-- Like 'runClient' and 'runClientWith', this will not return until
+-- the client terminates (ie, disconnects without reconnecting).
+reconnect :: Irc s ()
+reconnect = do
+  disconnect
+
+  -- create a new send queue
   s <- getIrcState
-  liftIO . atomically $ do
-    closeTBMChan (_sendqueue s)
-    writeTVar (_connectionState s) Disconnected
+  liftIO . atomically $
+    writeTVar (_sendqueue s) =<< newTBMChan 16
+
+  runner
 
 
 -------------------------------------------------------------------------------

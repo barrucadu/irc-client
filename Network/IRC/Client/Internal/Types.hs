@@ -62,7 +62,7 @@ data IrcState s = IrcState { _connectionConfig :: ConnectionConfig s
                            -- ^Mutable user state
                            , _instanceConfig   :: TVar (InstanceConfig s)
                            -- ^Mutable instance configuration in STM
-                           , _sendqueue        :: TBMChan IrcMessage
+                           , _sendqueue        :: TVar (TBMChan IrcMessage)
                            -- ^ Message send queue.
                            , _connectionState  :: TVar ConnectionState
                            -- ^State of the connection.

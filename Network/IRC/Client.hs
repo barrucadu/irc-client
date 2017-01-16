@@ -111,6 +111,7 @@ module Network.IRC.Client
   , send
   , sendBS
   , disconnect
+  , reconnect
 
   -- ** From event handlers
 
@@ -279,7 +280,7 @@ newIrcState cconf iconf ustate = liftIO $ do
   ustvar <- newTVarIO ustate
   ictvar <- newTVarIO iconf
   cstvar <- newTVarIO Disconnected
-  squeue <- newTBMChanIO 16
+  squeue <- newTVarIO =<< newTBMChanIO 16
 
   pure IrcState
     { _connectionConfig = cconf
