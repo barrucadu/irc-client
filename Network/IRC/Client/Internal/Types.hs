@@ -113,7 +113,8 @@ data InstanceConfig s = InstanceConfig
   -- ^ The version is sent in response to the CTCP \"VERSION\" request by
   -- the default event handlers.
   , _handlers :: [EventHandler s]
-  -- ^ The registered event handlers
+  -- ^ The registered event handlers. The order in this list is the
+  -- order in which they are executed.
   , _ignore   :: [(Text, Maybe Text)]
   -- ^ List of nicks (optionally restricted to channels) to ignore
   -- messages from. 'Nothing' ignores globally.

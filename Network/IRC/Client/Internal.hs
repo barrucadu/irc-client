@@ -148,8 +148,7 @@ forgetful = awaitForever go where
   go (Left  _) = return ()
   go (Right b) = yield b
 
--- | Block on receiving a message and invoke all matching handlers
--- concurrently.
+-- | Block on receiving a message and invoke all matching handlers.
 eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> Consumer (Event ByteString) m ()
 eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
@@ -164,7 +163,7 @@ eventSink lastReceived ircstate = go where
       iconf <- snapshot instanceConfig ircstate
       forM_ (get handlers iconf) $ \(EventHandler matcher handler) ->
         maybe (pure ())
-              (void . forkIO . flip runIRCAction ircstate . handler (_source event'))
+              (void . flip runIRCAction ircstate . handler (_source event'))
               (matcher event')
 
     -- If disconnected, do not loop.
