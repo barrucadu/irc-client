@@ -18,6 +18,7 @@
 -- of this library.
 module Network.IRC.Client.Internal.Types where
 
+import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
 import Control.Monad.Catch (Exception, MonadThrow, MonadCatch, MonadMask, SomeException)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -67,6 +68,8 @@ data IRCState s = IRCState
   -- ^ Message send queue.
   , _connectionState  :: TVar ConnectionState
   -- ^ State of the connection.
+  , _runningThreads   :: TVar [ThreadId]
+  -- ^ Threads which will be killed when the client disconnects.
   }
 
 -- | The static state of an IRC server connection.
@@ -150,3 +153,10 @@ data Timeout = Timeout
   deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 instance Exception Timeout
+
+-- | Exception thrown to all managed threads when the client
+-- disconnects.
+data Disconnect = Disconnect
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+instance Exception Disconnect

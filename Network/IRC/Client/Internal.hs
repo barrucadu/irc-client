@@ -262,6 +262,12 @@ disconnect = do
           closeTBMChan =<< readTVar (_sendqueue s)
           writeTVar (_connectionState s) Disconnected
 
+        -- Kill all managed threads. Don't wait for them to terminate
+        -- here, as they might be masking exceptions and not pick up
+        -- the 'Disconnect' for a while; just clear the list.
+        mapM_ (`throwTo` Disconnect) =<< readTVarIO (_runningThreads s)
+        atomically $ writeTVar (_runningThreads s) []
+
       -- If already disconnected, or disconnecting, do nothing.
       _ -> pure ()
 

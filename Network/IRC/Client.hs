@@ -144,6 +144,15 @@ module Network.IRC.Client
   -- exception will be thrown, killing it.
   , Timeout(..)
 
+  -- * Concurrency
+
+  -- | A client can manage a collection of threads, which get thrown
+  -- the 'Disconnect' exception whenever the client disconnects for
+  -- any reason (including a call to 'reconnect'). These can be
+  -- created from event handlers to manage long-running tasks.
+  , U.fork
+  , Disconnect(..)
+
   -- * Lenses
   , module Network.IRC.Client.Lens
 
@@ -171,7 +180,9 @@ import qualified Network.TLS as TLS
 import Network.IRC.Client.Events
 import Network.IRC.Client.Internal
 import Network.IRC.Client.Lens
-import Network.IRC.Client.Utils
+-- I think exporting 'fork' with 'Disconnect' gives better documentation.
+import Network.IRC.Client.Utils hiding (fork)
+import qualified Network.IRC.Client.Utils as U
 
 import qualified Paths_irc_client as Paths
 
@@ -276,16 +287,9 @@ newIRCState :: MonadIO m
   -> s
   -- ^ The initial value for the user state.
   -> m (IRCState s)
-newIRCState cconf iconf ustate = liftIO $ do
-  ustvar <- newTVarIO ustate
-  ictvar <- newTVarIO iconf
-  cstvar <- newTVarIO Disconnected
-  squeue <- newTVarIO =<< newTBMChanIO 16
-
-  pure IRCState
-    { _connectionConfig = cconf
-    , _userState        = ustvar
-    , _instanceConfig   = ictvar
-    , _connectionState  = cstvar
-    , _sendqueue        = squeue
-    }
+newIRCState cconf iconf ustate = liftIO $ IRCState cconf
+  <$> newTVarIO ustate
+  <*> newTVarIO iconf
+  <*> (newTVarIO =<< newTBMChanIO 16)
+  <*> newTVarIO Disconnected
+  <*> newTVarIO []
