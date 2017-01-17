@@ -56,17 +56,18 @@ instance MonadState s (IRC s) where
 -- * State
 
 -- | The state of an IRC session.
-data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
-                           -- ^Read-only connection configuration
-                           , _userState        :: TVar s
-                           -- ^Mutable user state
-                           , _instanceConfig   :: TVar (InstanceConfig s)
-                           -- ^Mutable instance configuration in STM
-                           , _sendqueue        :: TVar (TBMChan (Message ByteString))
-                           -- ^ Message send queue.
-                           , _connectionState  :: TVar ConnectionState
-                           -- ^State of the connection.
-                           }
+data IRCState s = IRCState
+  { _connectionConfig :: ConnectionConfig s
+  -- ^ Read-only connection configuration
+  , _userState        :: TVar s
+  -- ^ Mutable user state
+  , _instanceConfig   :: TVar (InstanceConfig s)
+  -- ^ Mutable instance configuration in STM
+  , _sendqueue        :: TVar (TBMChan (Message ByteString))
+  -- ^ Message send queue.
+  , _connectionState  :: TVar ConnectionState
+  -- ^ State of the connection.
+  }
 
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
