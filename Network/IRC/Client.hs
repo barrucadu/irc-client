@@ -263,7 +263,7 @@ runClient cconf iconf ustate = newIRCState cconf iconf ustate >>= runClientWith
 -- utility of this is to be able to run @IRC s a@ actions in order to
 -- interact with the client from the outside.
 runClientWith :: MonadIO m => IRCState s -> m ()
-runClientWith = flip runIRCAction runner
+runClientWith = runIRCAction runner
 
 
 -------------------------------------------------------------------------------

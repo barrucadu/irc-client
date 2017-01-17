@@ -101,7 +101,7 @@ runner = do
   let thePass = get password cconf
 
   -- Initialise the IRC session
-  let initialise = runIRCAction state $ do
+  let initialise = flip runIRCAction state $ do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
@@ -164,7 +164,7 @@ eventSink lastReceived ircstate = go where
       iconf <- snapshot instanceConfig ircstate
       forM_ (get handlers iconf) $ \(EventHandler matcher handler) ->
         maybe (pure ())
-              (void . forkIO . runIRCAction ircstate . handler (_source event'))
+              (void . forkIO . flip runIRCAction ircstate . handler (_source event'))
               (matcher event')
 
     -- If disconnected, do not loop.
@@ -290,8 +290,8 @@ reconnect = do
 -- * Utils
 
 -- | Interact with a client from the outside, by using its 'IRCState'.
-runIRCAction :: MonadIO m => IRCState s -> IRC s a -> m a
-runIRCAction s = liftIO . flip runReaderT s . runIRC
+runIRCAction :: MonadIO m => IRC s a -> IRCState s -> m a
+runIRCAction ma = liftIO . runReaderT (runIRC ma)
 
 -- | Access the client state.
 getIRCState :: IRC s (IRCState s)
