@@ -167,6 +167,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString (ByteString)
 import qualified Data.Conduit.Network.TLS as TLS
 import Data.Conduit.TMChan (newTBMChanIO)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
@@ -292,4 +293,4 @@ newIRCState cconf iconf ustate = liftIO $ IRCState cconf
   <*> newTVarIO iconf
   <*> (newTVarIO =<< newTBMChanIO 16)
   <*> newTVarIO Disconnected
-  <*> newTVarIO []
+  <*> newTVarIO S.empty

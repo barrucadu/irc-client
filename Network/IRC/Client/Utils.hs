@@ -44,6 +44,7 @@ module Network.IRC.Client.Utils
 import Control.Concurrent (ThreadId, myThreadId, forkFinally)
 import Control.Concurrent.STM (TVar, STM, atomically, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Network.IRC.Conduit (Event(..), Message(..), Source(..))
@@ -149,6 +150,6 @@ fork ma = do
   liftIO $ do
     tid <- forkFinally (runIRCAction ma s) $ \_ -> do
       tid <- myThreadId
-      atomically $ modifyTVar (_runningThreads s) (filter (/=tid))
-    atomically $ modifyTVar (_runningThreads s) (tid:)
+      atomically $ modifyTVar (_runningThreads s) (S.delete tid)
+    atomically $ modifyTVar (_runningThreads s) (S.insert tid)
     pure tid

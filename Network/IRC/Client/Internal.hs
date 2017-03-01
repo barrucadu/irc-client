@@ -35,6 +35,7 @@ import Data.ByteString (ByteString)
 import Data.Conduit (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan (closeTBMChan, isClosedTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan, newTBMChan)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import qualified Data.Set as S
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
@@ -266,7 +267,7 @@ disconnect = do
         -- here, as they might be masking exceptions and not pick up
         -- the 'Disconnect' for a while; just clear the list.
         mapM_ (`throwTo` Disconnect) =<< readTVarIO (_runningThreads s)
-        atomically $ writeTVar (_runningThreads s) []
+        atomically $ writeTVar (_runningThreads s) S.empty
 
       -- If already disconnected, or disconnecting, do nothing.
       _ -> pure ()

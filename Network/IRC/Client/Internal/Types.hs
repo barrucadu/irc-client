@@ -27,6 +27,7 @@ import Control.Monad.State (MonadState(..))
 import Data.ByteString (ByteString)
 import Data.Conduit (Consumer, Producer)
 import Data.Conduit.TMChan (TBMChan)
+import qualified Data.Set as S
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
 import Network.IRC.Conduit (Event(..), Message, Source)
@@ -68,7 +69,7 @@ data IRCState s = IRCState
   -- ^ Message send queue.
   , _connectionState  :: TVar ConnectionState
   -- ^ State of the connection.
-  , _runningThreads   :: TVar [ThreadId]
+  , _runningThreads   :: TVar (S.Set ThreadId)
   -- ^ Threads which will be killed when the client disconnects.
   }
 
