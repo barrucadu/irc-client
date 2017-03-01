@@ -141,7 +141,7 @@ snapConnState = liftIO . atomically . getConnectionState =<< getIRCState
 -------------------------------------------------------------------------------
 -- Concurrency
 
--- | Fork a thread which will be sent a 'Disconnected' exception when
+-- | Fork a thread which will be thrown a 'Disconnect' exception when
 -- the client disconnects.
 fork :: IRC s () -> IRC s ThreadId
 fork ma = do
