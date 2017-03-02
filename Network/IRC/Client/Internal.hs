@@ -35,6 +35,7 @@ import Data.ByteString (ByteString)
 import Data.Conduit (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
 import Data.Conduit.TMChan (closeTBMChan, isClosedTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan, newTBMChan)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import qualified Data.Set as S
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
@@ -148,8 +149,7 @@ forgetful = awaitForever go where
   go (Left  _) = return ()
   go (Right b) = yield b
 
--- | Block on receiving a message and invoke all matching handlers
--- concurrently.
+-- | Block on receiving a message and invoke all matching handlers.
 eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> Consumer (Event ByteString) m ()
 eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
@@ -164,7 +164,7 @@ eventSink lastReceived ircstate = go where
       iconf <- snapshot instanceConfig ircstate
       forM_ (get handlers iconf) $ \(EventHandler matcher handler) ->
         maybe (pure ())
-              (void . forkIO . flip runIRCAction ircstate . handler (_source event'))
+              (void . flip runIRCAction ircstate . handler (_source event'))
               (matcher event')
 
     -- If disconnected, do not loop.
@@ -262,6 +262,12 @@ disconnect = do
         atomically $ do
           closeTBMChan =<< readTVar (_sendqueue s)
           writeTVar (_connectionState s) Disconnected
+
+        -- Kill all managed threads. Don't wait for them to terminate
+        -- here, as they might be masking exceptions and not pick up
+        -- the 'Disconnect' for a while; just clear the list.
+        mapM_ (`throwTo` Disconnect) =<< readTVarIO (_runningThreads s)
+        atomically $ writeTVar (_runningThreads s) S.empty
 
       -- If already disconnected, or disconnecting, do nothing.
       _ -> pure ()

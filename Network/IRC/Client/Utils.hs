@@ -30,6 +30,9 @@ module Network.IRC.Client.Utils
   , isDisconnected
   , snapConnState
 
+    -- * Concurrency
+  , fork
+
     -- * Lenses
   , snapshot
   , snapshotModify
@@ -38,8 +41,10 @@ module Network.IRC.Client.Utils
   , modify
   ) where
 
+import Control.Concurrent (ThreadId, myThreadId, forkFinally)
 import Control.Concurrent.STM (TVar, STM, atomically, modifyTVar)
 import Control.Monad.IO.Class (liftIO)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Network.IRC.Conduit (Event(..), Message(..), Source(..))
@@ -132,3 +137,19 @@ isDisconnected = (==Disconnected) <$> snapConnState
 -- | Snapshot the connection state.
 snapConnState :: IRC s ConnectionState
 snapConnState = liftIO . atomically . getConnectionState =<< getIRCState
+
+
+-------------------------------------------------------------------------------
+-- Concurrency
+
+-- | Fork a thread which will be thrown a 'Disconnect' exception when
+-- the client disconnects.
+fork :: IRC s () -> IRC s ThreadId
+fork ma = do
+  s <- getIRCState
+  liftIO $ do
+    tid <- forkFinally (runIRCAction ma s) $ \_ -> do
+      tid <- myThreadId
+      atomically $ modifyTVar (_runningThreads s) (S.delete tid)
+    atomically $ modifyTVar (_runningThreads s) (S.insert tid)
+    pure tid

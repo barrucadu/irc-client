@@ -11,7 +11,8 @@
 -- Portability : CPP, OverloadedStrings, RankNTypes
 --
 -- Events and event handlers. When a message is received from the
--- server, all matching handlers are executed concurrently.
+-- server, all matching handlers are executed sequentially in the
+-- order that they appear in the 'handlers' list.
 module Network.IRC.Client.Events
   ( -- * Handlers
     EventHandler(..)

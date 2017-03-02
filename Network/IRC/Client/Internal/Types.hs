@@ -18,6 +18,7 @@
 -- of this library.
 module Network.IRC.Client.Internal.Types where
 
+import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
 import Control.Monad.Catch (Exception, MonadThrow, MonadCatch, MonadMask, SomeException)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -26,6 +27,7 @@ import Control.Monad.State (MonadState(..))
 import Data.ByteString (ByteString)
 import Data.Conduit (Consumer, Producer)
 import Data.Conduit.TMChan (TBMChan)
+import qualified Data.Set as S
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
 import Network.IRC.Conduit (Event(..), Message, Source)
@@ -56,17 +58,20 @@ instance MonadState s (IRC s) where
 -- * State
 
 -- | The state of an IRC session.
-data IRCState s = IRCState { _connectionConfig :: ConnectionConfig s
-                           -- ^Read-only connection configuration
-                           , _userState        :: TVar s
-                           -- ^Mutable user state
-                           , _instanceConfig   :: TVar (InstanceConfig s)
-                           -- ^Mutable instance configuration in STM
-                           , _sendqueue        :: TVar (TBMChan (Message ByteString))
-                           -- ^ Message send queue.
-                           , _connectionState  :: TVar ConnectionState
-                           -- ^State of the connection.
-                           }
+data IRCState s = IRCState
+  { _connectionConfig :: ConnectionConfig s
+  -- ^ Read-only connection configuration
+  , _userState        :: TVar s
+  -- ^ Mutable user state
+  , _instanceConfig   :: TVar (InstanceConfig s)
+  -- ^ Mutable instance configuration in STM
+  , _sendqueue        :: TVar (TBMChan (Message ByteString))
+  -- ^ Message send queue.
+  , _connectionState  :: TVar ConnectionState
+  -- ^ State of the connection.
+  , _runningThreads   :: TVar (S.Set ThreadId)
+  -- ^ Threads which will be killed when the client disconnects.
+  }
 
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
@@ -113,7 +118,8 @@ data InstanceConfig s = InstanceConfig
   -- ^ The version is sent in response to the CTCP \"VERSION\" request by
   -- the default event handlers.
   , _handlers :: [EventHandler s]
-  -- ^ The registered event handlers
+  -- ^ The registered event handlers. The order in this list is the
+  -- order in which they are executed.
   , _ignore   :: [(Text, Maybe Text)]
   -- ^ List of nicks (optionally restricted to channels) to ignore
   -- messages from. 'Nothing' ignores globally.
@@ -148,3 +154,10 @@ data Timeout = Timeout
   deriving (Bounded, Enum, Eq, Ord, Read, Show)
 
 instance Exception Timeout
+
+-- | Exception thrown to all managed threads when the client
+-- disconnects.
+data Disconnect = Disconnect
+  deriving (Bounded, Enum, Eq, Ord, Read, Show)
+
+instance Exception Disconnect
