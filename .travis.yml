@@ -10,19 +10,20 @@ cache:
   - $HOME/.cabal
   - $HOME/.stack
 
-# Build matrix configuration
+# Goal: support latest 3 GHC major versions.
 matrix:
+  fast_finish: true
   include:
-  - env: RESOLVER="lts-4"
+  - env: RESOLVER=lts-6 # GHC 7.10
     addons: {apt: {packages: [libgmp-dev]}}
-  - env: RESOLVER="lts-5"
+  - env: RESOLVER=lts-9 # GHC 8.0
     addons: {apt: {packages: [libgmp-dev]}}
-  - env: RESOLVER="lts-6"
+  # - env: RESOLVER= # GHC 8.2
+  #   addons: {apt: {packages: [libgmp-dev]}}
+  - env: RESOLVER=nightly
     addons: {apt: {packages: [libgmp-dev]}}
-  - env: RESOLVER="lts-7"
-    addons: {apt: {packages: [libgmp-dev]}}
-  - env: RESOLVER="nightly"
-    addons: {apt: {packages: [libgmp-dev]}}
+  allow_failures:
+  - env: RESOLVER=nightly
 
 # Download and unpack the stack executable
 before_install:
@@ -30,7 +31,7 @@ before_install:
 - mkdir -p ~/.local/bin
 - curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
 
-# Test build
+# test build
 script:
-- stack --no-terminal --resolver=$RESOLVER setup
-- stack --no-terminal --resolver=$RESOLVER build
+- stack --resolver=$RESOLVER setup
+- stack --resolver=$RESOLVER build
