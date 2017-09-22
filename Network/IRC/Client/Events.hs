@@ -125,14 +125,14 @@ matchNumeric num ev = case _message ev of
 -- | Match events of the given type. Refer to
 -- "Network.IRC.Conduit.Lens#Message" for the list of 'Prism''s.
 --
--- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> Just "hello world"
--- > matchType _Quit    ":foo QUIT :goodbye world"       ==> Just "goodbye world"
+-- > matchType _Privmsg ":foo PRIVMSG #bar :hello world" ==> Just ("#bar", Right "hello world")
+-- > matchType _Quit    ":foo QUIT :goodbye world"       ==> Just (Just "goodbye world")
 matchType :: Prism' (Message a) b -> Event a -> Maybe b
 matchType k = preview k . _message
 
 -- | Match a predicate against an event.
 --
--- > matchWhen (const True) ":foo PRIVMSG #bar :hello world" ==> Just "PRIVMSG :hello world"
+-- > matchWhen (const True) ":foo PRIVMSG #bar :hello world" ==> Just ":foo PRIVMSG :hello world"
 matchWhen :: (Event a -> Bool) -> Event a -> Maybe (Message a)
 matchWhen p ev | p ev = Just (_message ev)
 matchWhen _ _ = Nothing
