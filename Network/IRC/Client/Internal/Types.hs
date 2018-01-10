@@ -18,8 +18,10 @@
 -- of this library.
 module Network.IRC.Client.Internal.Types where
 
+import Control.Applicative (Alternative)
 import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
+import Control.Monad (MonadPlus)
 import Control.Monad.Catch (Exception, MonadThrow, MonadCatch, MonadMask, SomeException)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, asks)
@@ -38,7 +40,7 @@ import Network.IRC.Conduit (Event(..), Message, Source)
 
 -- | The IRC monad.
 newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader (IRCState s), MonadThrow, MonadCatch, MonadMask)
+  deriving (Functor, Applicative, Alternative, Monad, MonadPlus, MonadIO, MonadReader (IRCState s), MonadThrow, MonadCatch, MonadMask)
 
 instance MonadState s (IRC s) where
   state f = do
