@@ -163,10 +163,10 @@ module Network.IRC.Client
   ) where
 
 import Control.Concurrent.STM (newTVarIO)
+import Control.Concurrent.STM.TBMChan (newTBMChanIO)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.ByteString (ByteString)
 import qualified Data.Conduit.Network.TLS as TLS
-import Data.Conduit.TMChan (newTBMChanIO)
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T

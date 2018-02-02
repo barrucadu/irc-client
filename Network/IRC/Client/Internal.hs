@@ -26,13 +26,14 @@ module Network.IRC.Client.Internal
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay, throwTo)
 import Control.Concurrent.STM (STM, atomically, readTVar, readTVarIO, writeTVar)
+import Control.Concurrent.STM.TBMChan (TBMChan, closeTBMChan, isClosedTBMChan, isEmptyTBMChan, readTBMChan, writeTBMChan, newTBMChan)
 import Control.Monad (forM_, unless, void, when)
 import Control.Monad.Catch (SomeException, catch)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ask, runReaderT)
 import Data.ByteString (ByteString)
-import Data.Conduit (Producer, Conduit, Consumer, (=$=), ($=), (=$), await, awaitForever, toProducer, yield)
-import Data.Conduit.TMChan (closeTBMChan, isClosedTBMChan, isEmptyTBMChan, sourceTBMChan, writeTBMChan, newTBMChan)
+import Data.Conduit ((=$=), ($=), (=$), await, awaitForever, toProducer, yield)
+import qualified Data.Conduit as C
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -58,7 +59,7 @@ import Network.IRC.Client.Lens
 -- | Config to connect to a server using the supplied connection
 -- function.
 setupInternal
-  :: (IO () -> Consumer (Either ByteString (Event ByteString)) IO () -> Producer IO (Message ByteString) -> IO ())
+  :: (IO () -> C.Consumer (Either ByteString (Event ByteString)) IO () -> C.Producer IO (Message ByteString) -> IO ())
   -- ^ Function to start the network conduits.
   -> IRC s ()
   -- ^ Connect handler
@@ -143,13 +144,13 @@ runner = do
   _ondisconnect cconf exc
 
 -- | Forget failed decodings.
-forgetful :: Monad m => Conduit (Either a b) m b
+forgetful :: Monad m => C.Conduit (Either a b) m b
 forgetful = awaitForever go where
   go (Left  _) = return ()
   go (Right b) = yield b
 
 -- | Block on receiving a message and invoke all matching handlers.
-eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> Consumer (Event ByteString) m ()
+eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> C.Consumer (Event ByteString) m ()
 eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
     -- Record the current time.
@@ -183,7 +184,7 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |A conduit which logs everything which goes through it.
-logConduit :: MonadIO m => (a -> IO ()) -> Conduit a m a
+logConduit :: MonadIO m => (a -> IO ()) -> C.Conduit a m a
 logConduit logf = awaitForever $ \x -> do
   -- Call the logging function
   liftIO $ logf x
@@ -315,3 +316,19 @@ timeoutBlock dt check = liftIO $ do
         cond <- check
         when (now < finish && not cond) wait
   wait
+
+-- | A simple wrapper around a TBMChan. As data is pushed into the
+-- channel, the source will read it and pass it down the conduit
+-- pipeline. When the channel is closed, the source will close also.
+--
+-- If the channel fills up, the pipeline will stall until values are
+-- read.
+--
+-- From stm-conduit-3.0.0 (by Clark Gaebel <cg.wowus.cg@gmail.com>)
+sourceTBMChan :: MonadIO m => TBMChan a -> C.Source m a
+sourceTBMChan ch = loop where
+  loop = do
+    a <- liftIO . atomically $ readTBMChan ch
+    case a of
+      Just x  -> yield x >> loop
+      Nothing -> pure ()
