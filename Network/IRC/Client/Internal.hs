@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -10,7 +9,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : CPP, LambdaCase, OverloadedStrings, RankNTypes, ScopedTypeVariables
+-- Portability : CPP, OverloadedStrings, RankNTypes, ScopedTypeVariables
 --
 -- Most of the hairy code. This isn't all internal, due to messy
 -- dependencies, but I've tried to make this as \"internal\" as
