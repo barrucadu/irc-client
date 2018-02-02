@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
@@ -9,7 +8,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : CPP, OverloadedStrings, RankNTypes, ScopedTypeVariables
+-- Portability : CPP, OverloadedStrings, ScopedTypeVariables
 --
 -- Most of the hairy code. This isn't all internal, due to messy
 -- dependencies, but I've tried to make this as \"internal\" as
@@ -32,14 +31,14 @@ import Control.Monad.Catch (SomeException, catch)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (ask, runReaderT)
 import Data.ByteString (ByteString)
-import Data.Conduit ((=$=), ($=), (=$), await, awaitForever, toProducer, yield)
-import qualified Data.Conduit as C
+import Data.Conduit (ConduitM, (.|), await, awaitForever, yield)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Data.Set as S
 import Data.Text (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Format (formatTime)
+import Data.Void (Void)
 import Network.IRC.Conduit (Event(..), Message(..), Source(..), floodProtector, rawMessage, toByteString)
 
 #if MIN_VERSION_time(1,5,0)
@@ -59,7 +58,7 @@ import Network.IRC.Client.Lens
 -- | Config to connect to a server using the supplied connection
 -- function.
 setupInternal
-  :: (IO () -> C.Consumer (Either ByteString (Event ByteString)) IO () -> C.Producer IO (Message ByteString) -> IO ())
+  :: (IO () -> ConduitM (Either ByteString (Event ByteString)) Void IO () -> ConduitM () (Message ByteString) IO () -> IO ())
   -- ^ Function to start the network conduits.
   -> IRC s ()
   -- ^ Connect handler
@@ -117,11 +116,12 @@ runner = do
 
   squeue <- liftIO . readTVarIO $ _sendqueue state
 
-  let source = toProducer $ sourceTBMChan squeue
-                          $= antiflood
-                          $= logConduit (_logfunc cconf FromClient . toByteString)
-  let sink   = forgetful =$= logConduit (_logfunc cconf FromServer . _raw)
-                         =$ eventSink lastReceived state
+  let source = sourceTBMChan squeue
+               .| antiflood
+               .| logConduit (_logfunc cconf FromClient . toByteString)
+  let sink   = forgetful
+               .| logConduit (_logfunc cconf FromServer . _raw)
+               .| eventSink lastReceived state
 
   -- Fork a thread to disconnect if the timeout elapses.
   mainTId <- liftIO myThreadId
@@ -144,13 +144,13 @@ runner = do
   _ondisconnect cconf exc
 
 -- | Forget failed decodings.
-forgetful :: Monad m => C.Conduit (Either a b) m b
+forgetful :: Monad m => ConduitM (Either a b) b m ()
 forgetful = awaitForever go where
   go (Left  _) = return ()
   go (Right b) = yield b
 
 -- | Block on receiving a message and invoke all matching handlers.
-eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> C.Consumer (Event ByteString) m ()
+eventSink :: MonadIO m => IORef UTCTime -> IRCState s -> ConduitM (Event ByteString) o m ()
 eventSink lastReceived ircstate = go where
   go = await >>= maybe (return ()) (\event -> do
     -- Record the current time.
@@ -184,7 +184,7 @@ isIgnored ircstate ev = do
       Server  _   -> False
 
 -- |A conduit which logs everything which goes through it.
-logConduit :: MonadIO m => (a -> IO ()) -> C.Conduit a m a
+logConduit :: MonadIO m => (a -> IO ()) -> ConduitM a a m ()
 logConduit logf = awaitForever $ \x -> do
   -- Call the logging function
   liftIO $ logf x
@@ -325,7 +325,7 @@ timeoutBlock dt check = liftIO $ do
 -- read.
 --
 -- From stm-conduit-3.0.0 (by Clark Gaebel <cg.wowus.cg@gmail.com>)
-sourceTBMChan :: MonadIO m => TBMChan a -> C.Source m a
+sourceTBMChan :: MonadIO m => TBMChan a -> ConduitM () a m ()
 sourceTBMChan ch = loop where
   loop = do
     a <- liftIO . atomically $ readTBMChan ch

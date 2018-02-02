@@ -2,7 +2,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- |
 -- Module      : Network.IRC.Client.Internal.Types
@@ -10,7 +9,7 @@
 -- License     : MIT
 -- Maintainer  : Michael Walker <mike@barrucadu.co.uk>
 -- Stability   : experimental
--- Portability : FlexibleInstances, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RankNTypes
+-- Portability : FlexibleInstances, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses
 --
 -- Internal types. Most of these are re-exported elsewhere as lenses.
 --
@@ -28,10 +27,11 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT, asks)
 import Control.Monad.State (MonadState(..))
 import Data.ByteString (ByteString)
-import Data.Conduit (Consumer, Producer)
+import Data.Conduit (ConduitM)
 import qualified Data.Set as S
 import Data.Text (Text)
 import Data.Time.Clock (NominalDiffTime)
+import Data.Void (Void)
 import Network.IRC.Conduit (Event(..), Message, Source)
 
 
@@ -77,7 +77,7 @@ data IRCState s = IRCState
 
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
-  { _func       :: IO () -> Consumer (Either ByteString (Event ByteString)) IO () -> Producer IO (Message ByteString) -> IO ()
+  { _func       :: IO () -> ConduitM (Either ByteString (Event ByteString)) Void IO () -> ConduitM () (Message ByteString) IO () -> IO ()
   -- ^ Function to connect and start the conduits.
   , _server     :: ByteString
   -- ^ The server host.
