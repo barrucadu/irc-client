@@ -10,7 +10,7 @@ name:                irc-client
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             1.1.0.3
+version:             1.1.0.4
 
 -- A short (one-line) description of the package.
 synopsis:            An IRC client library.
@@ -91,7 +91,7 @@ library
                      , containers          >=0.1   && <1
                      , conduit             >=1.2.8 && <1.4
                      , connection          >=0.2   && <0.3
-                     , contravariant       >=0.1   && <1.5
+                     , contravariant       >=0.1   && <1.6
                      , exceptions          >=0.6   && <0.11
                      , irc-conduit         >=0.3   && <0.4
                      , irc-ctcp            >=0.1.2 && <0.2
@@ -124,4 +124,4 @@ source-repository head
 source-repository this
   type:     git
   location: https://github.com/barrucadu/irc-client.git
-  tag:      1.1.0.3
+  tag:      1.1.0.4
