@@ -18,6 +18,8 @@ matrix:
     addons: {apt: {packages: [libgmp-dev]}}
   - env: RESOLVER="lts-10"
     addons: {apt: {packages: [libgmp-dev]}}
+  - env: RESOLVER="lts-12"
+    addons: {apt: {packages: [libgmp-dev]}}
   - env: RESOLVER="nightly"
     addons: {apt: {packages: [libgmp-dev]}}
   allow_failures:
