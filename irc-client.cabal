@@ -90,7 +90,7 @@ library
                      , bytestring          >=0.10  && <0.11
                      , containers          >=0.1   && <1
                      , conduit             >=1.2.8 && <1.4
-                     , connection          >=0.2   && <0.3
+                     , connection          >=0.2   && <0.4
                      , contravariant       >=0.1   && <1.6
                      , exceptions          >=0.6   && <0.11
                      , irc-conduit         >=0.3   && <0.4
