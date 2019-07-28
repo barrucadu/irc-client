@@ -28,6 +28,7 @@ module Network.IRC.Client.Events
 
   -- ** Individual handlers
   , pingHandler
+  , kickHandler
   , ctcpPingHandler
   , ctcpVersionHandler
   , ctcpTimeHandler
