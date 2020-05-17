@@ -15,13 +15,14 @@
 -- of this library.
 module Network.IRC.Client.Internal.Lens where
 
-import Control.Applicative (Const(..))
-import Control.Concurrent.STM (TVar, STM, atomically, readTVar, writeTVar)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Functor.Contravariant (Contravariant)
-import Data.Functor.Identity (Identity(..))
-import Data.Monoid (First(..))
-import Data.Profunctor (Choice)
+import           Control.Applicative        (Const(..))
+import           Control.Concurrent.STM     (STM, TVar, atomically, readTVar,
+                                             writeTVar)
+import           Control.Monad.IO.Class     (MonadIO, liftIO)
+import           Data.Functor.Contravariant (Contravariant)
+import           Data.Functor.Identity      (Identity(..))
+import           Data.Monoid                (First(..))
+import           Data.Profunctor            (Choice)
 
 
 -------------------------------------------------------------------------------

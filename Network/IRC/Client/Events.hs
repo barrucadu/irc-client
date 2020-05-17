@@ -44,31 +44,33 @@ module Network.IRC.Client.Events
   , module Network.IRC.Conduit.Lens
   ) where
 
-import Control.Applicative ((<$>), (<|>))
-import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
-import Control.Monad.Catch (SomeException, fromException, throwM)
-import Control.Monad.IO.Class (liftIO)
-import Data.Char (isAlphaNum)
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
-import Data.Text (Text, breakOn, takeEnd, toUpper)
-import Data.Time.Clock (getCurrentTime)
-import Data.Time.Format (formatTime)
-import Network.IRC.Conduit (Event(..), Message(..), Source(..))
-import Network.IRC.CTCP (fromCTCP)
-import Network.IRC.Conduit.Lens
+import           Control.Applicative         ((<$>), (<|>))
+import           Control.Concurrent.STM      (atomically, modifyTVar, readTVar)
+import           Control.Monad.Catch         (SomeException, fromException,
+                                              throwM)
+import           Control.Monad.IO.Class      (liftIO)
+import           Data.Char                   (isAlphaNum)
+import           Data.Maybe                  (fromMaybe)
+import           Data.Monoid                 ((<>))
+import           Data.Text                   (Text, breakOn, takeEnd, toUpper)
+import           Data.Time.Clock             (getCurrentTime)
+import           Data.Time.Format            (formatTime)
+import           Network.IRC.Conduit         (Event(..), Message(..),
+                                              Source(..))
+import           Network.IRC.Conduit.Lens
+import           Network.IRC.CTCP            (fromCTCP)
 
 #if MIN_VERSION_time(1,5,0)
-import Data.Time.Format (defaultTimeLocale)
+import           Data.Time.Format            (defaultTimeLocale)
 #else
-import System.Locale (defaultTimeLocale)
+import           System.Locale               (defaultTimeLocale)
 #endif
 
-import qualified Data.Text as T
+import qualified Data.Text                   as T
 
-import Network.IRC.Client.Internal
-import Network.IRC.Client.Lens
-import Network.IRC.Client.Utils
+import           Network.IRC.Client.Internal
+import           Network.IRC.Client.Lens
+import           Network.IRC.Client.Utils
 
 
 -------------------------------------------------------------------------------

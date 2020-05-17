@@ -162,30 +162,30 @@ module Network.IRC.Client
   , C.toByteString
   ) where
 
-import Control.Concurrent.STM (newTVarIO)
-import Control.Concurrent.STM.TBMChan (newTBMChanIO)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.ByteString (ByteString)
-import qualified Data.Conduit.Network.TLS as TLS
-import qualified Data.Set as S
-import Data.Text (Text)
-import qualified Data.Text as T
-import Data.Version (showVersion)
-import qualified Data.X509 as X
-import qualified Data.X509.CertificateStore as X
-import qualified Data.X509.Validation as X
-import Network.Connection as TLS (TLSSettings(..))
-import qualified Network.IRC.Conduit as C
-import qualified Network.TLS as TLS
+import           Control.Concurrent.STM         (newTVarIO)
+import           Control.Concurrent.STM.TBMChan (newTBMChanIO)
+import           Control.Monad.IO.Class         (MonadIO, liftIO)
+import           Data.ByteString                (ByteString)
+import qualified Data.Conduit.Network.TLS       as TLS
+import qualified Data.Set                       as S
+import           Data.Text                      (Text)
+import qualified Data.Text                      as T
+import           Data.Version                   (showVersion)
+import qualified Data.X509                      as X
+import qualified Data.X509.CertificateStore     as X
+import qualified Data.X509.Validation           as X
+import           Network.Connection             as TLS (TLSSettings(..))
+import qualified Network.IRC.Conduit            as C
+import qualified Network.TLS                    as TLS
 
-import Network.IRC.Client.Events
-import Network.IRC.Client.Internal
-import Network.IRC.Client.Lens
+import           Network.IRC.Client.Events
+import           Network.IRC.Client.Internal
+import           Network.IRC.Client.Lens
 -- I think exporting 'fork' with 'Disconnect' gives better documentation.
-import Network.IRC.Client.Utils hiding (fork)
-import qualified Network.IRC.Client.Utils as U
+import           Network.IRC.Client.Utils       hiding (fork)
+import qualified Network.IRC.Client.Utils       as U
 
-import qualified Paths_irc_client as Paths
+import qualified Paths_irc_client               as Paths
 
 
 -------------------------------------------------------------------------------

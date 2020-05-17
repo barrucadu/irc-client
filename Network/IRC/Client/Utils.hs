@@ -41,17 +41,18 @@ module Network.IRC.Client.Utils
   , modify
   ) where
 
-import Control.Concurrent (ThreadId, myThreadId, forkFinally)
-import Control.Concurrent.STM (TVar, STM, atomically, modifyTVar)
-import Control.Monad.IO.Class (liftIO)
-import qualified Data.Set as S
-import Data.Text (Text)
-import qualified Data.Text as T
-import Network.IRC.Conduit (Event(..), Message(..), Source(..))
-import Network.IRC.CTCP (toCTCP)
+import           Control.Concurrent          (ThreadId, forkFinally, myThreadId)
+import           Control.Concurrent.STM      (STM, TVar, atomically, modifyTVar)
+import           Control.Monad.IO.Class      (liftIO)
+import qualified Data.Set                    as S
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
+import           Network.IRC.Conduit         (Event(..), Message(..),
+                                              Source(..))
+import           Network.IRC.CTCP            (toCTCP)
 
-import Network.IRC.Client.Internal
-import Network.IRC.Client.Lens
+import           Network.IRC.Client.Internal
+import           Network.IRC.Client.Lens
 
 -------------------------------------------------------------------------------
 -- Nicks
