@@ -1,0 +1,27 @@
+name: Run tests
+
+on: pull_request
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: mstksg/setup-stack@v1
+      - name: Setup
+        run: |
+          stack --no-terminal install stylish-haskell hlint
+      - name: Lint
+        run: |
+          set -ex
+          stack --no-terminal exec -- hlint --no-summary .
+          stack --no-terminal exec -- find . -name '*.hs' -exec stylish-haskell -i {} \;
+          git diff --exit-code
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: mstksg/setup-stack@v1
+      - name: Build
+        run: |
+          stack --no-terminal build
