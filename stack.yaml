@@ -1,9 +1,7 @@
 flags: {}
 packages:
 - '.'
-resolver: lts-13.16
-extra-deps:
-- irc-conduit-0.3.0.3@sha256:66ff08c2ca7eb036e0137613353e158ae037df3832a85a07a90a458ae54f4418,4096
+resolver: lts-15.0
 nix:
   enable: false
   packages: [zlib]
