@@ -17,22 +17,25 @@
 -- of this library.
 module Network.IRC.Client.Internal.Types where
 
-import Control.Applicative (Alternative)
-import Control.Concurrent (ThreadId)
-import Control.Concurrent.STM (TVar, atomically, readTVar, writeTVar)
-import Control.Concurrent.STM.TBMChan (TBMChan)
-import Control.Monad (MonadPlus)
-import Control.Monad.Catch (Exception, MonadThrow, MonadCatch, MonadMask, SomeException)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ReaderT, asks)
-import Control.Monad.State (MonadState(..))
-import Data.ByteString (ByteString)
-import Data.Conduit (ConduitM)
-import qualified Data.Set as S
-import Data.Text (Text)
-import Data.Time.Clock (NominalDiffTime)
-import Data.Void (Void)
-import Network.IRC.Conduit (Event(..), Message, Source)
+import           Control.Applicative            (Alternative)
+import           Control.Concurrent             (ThreadId)
+import           Control.Concurrent.STM         (TVar, atomically, readTVar,
+                                                 readTVarIO, writeTVar)
+import           Control.Concurrent.STM.TBMChan (TBMChan)
+import           Control.Monad                  (MonadPlus)
+import           Control.Monad.Catch            (Exception, MonadCatch,
+                                                 MonadMask, MonadThrow,
+                                                 SomeException)
+import           Control.Monad.IO.Class         (MonadIO, liftIO)
+import           Control.Monad.Reader           (MonadReader, ReaderT, asks)
+import           Control.Monad.State            (MonadState(..))
+import           Data.ByteString                (ByteString)
+import           Data.Conduit                   (ConduitM)
+import qualified Data.Set                       as S
+import           Data.Text                      (Text)
+import           Data.Time.Clock                (NominalDiffTime)
+import           Data.Void                      (Void)
+import           Network.IRC.Conduit            (Event(..), Message, Source)
 
 
 -------------------------------------------------------------------------------
@@ -51,7 +54,7 @@ instance MonadState s (IRC s) where
       pure a
   get = do
     tvar <- asks _userState
-    liftIO $ atomically (readTVar tvar)
+    liftIO $ readTVarIO tvar
   put s = do
     tvar <- asks _userState
     liftIO $ atomically (writeTVar tvar s)

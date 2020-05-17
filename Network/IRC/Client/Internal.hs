@@ -22,34 +22,46 @@ module Network.IRC.Client.Internal
   , module Network.IRC.Client.Internal.Types
   ) where
 
-import Control.Applicative ((<$>))
-import Control.Concurrent (forkIO, killThread, myThreadId, threadDelay, throwTo)
-import Control.Concurrent.STM (STM, atomically, readTVar, readTVarIO, writeTVar)
-import Control.Concurrent.STM.TBMChan (TBMChan, closeTBMChan, isClosedTBMChan, isEmptyTBMChan, readTBMChan, writeTBMChan, newTBMChan)
-import Control.Monad (forM_, unless, void, when)
-import Control.Monad.Catch (SomeException, catch)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (ask, runReaderT)
-import Data.ByteString (ByteString)
-import Data.Conduit (ConduitM, (.|), await, awaitForever, yield)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import qualified Data.Set as S
-import Data.Text (Text)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import Data.Time.Clock (NominalDiffTime, UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
-import Data.Time.Format (formatTime)
-import Data.Void (Void)
-import Network.IRC.Conduit (Event(..), Message(..), Source(..), floodProtector, rawMessage, toByteString)
+import           Control.Applicative               ((<$>))
+import           Control.Concurrent                (forkIO, killThread,
+                                                    myThreadId, threadDelay,
+                                                    throwTo)
+import           Control.Concurrent.STM            (STM, atomically, readTVar,
+                                                    readTVarIO, writeTVar)
+import           Control.Concurrent.STM.TBMChan    (TBMChan, closeTBMChan,
+                                                    isClosedTBMChan,
+                                                    isEmptyTBMChan, newTBMChan,
+                                                    readTBMChan, writeTBMChan)
+import           Control.Monad                     (forM_, unless, void, when)
+import           Control.Monad.Catch               (SomeException, catch)
+import           Control.Monad.IO.Class            (MonadIO, liftIO)
+import           Control.Monad.Reader              (ask, runReaderT)
+import           Data.ByteString                   (ByteString)
+import           Data.Conduit                      (ConduitM, await,
+                                                    awaitForever, yield, (.|))
+import           Data.IORef                        (IORef, newIORef, readIORef,
+                                                    writeIORef)
+import qualified Data.Set                          as S
+import           Data.Text                         (Text)
+import           Data.Text.Encoding                (decodeUtf8, encodeUtf8)
+import           Data.Time.Clock                   (NominalDiffTime, UTCTime,
+                                                    addUTCTime, diffUTCTime,
+                                                    getCurrentTime)
+import           Data.Time.Format                  (formatTime)
+import           Data.Void                         (Void)
+import           Network.IRC.Conduit               (Event(..), Message(..),
+                                                    Source(..), floodProtector,
+                                                    rawMessage, toByteString)
 
 #if MIN_VERSION_time(1,5,0)
-import Data.Time.Format (defaultTimeLocale)
+import           Data.Time.Format                  (defaultTimeLocale)
 #else
-import System.Locale (defaultTimeLocale)
+import           System.Locale                     (defaultTimeLocale)
 #endif
 
-import Network.IRC.Client.Internal.Lens
-import Network.IRC.Client.Internal.Types
-import Network.IRC.Client.Lens
+import           Network.IRC.Client.Internal.Lens
+import           Network.IRC.Client.Internal.Types
+import           Network.IRC.Client.Lens
 
 
 -------------------------------------------------------------------------------

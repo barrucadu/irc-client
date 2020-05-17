@@ -1,4 +1,4 @@
-[irc-client][] [![Build Status][build-status]][build-log]
+[irc-client][]
 ===========
 
 An IRC client library.
@@ -18,9 +18,6 @@ An IRC client library.
 
  - Provides a few helper functions for common operations.
 
-The documentation of the latest developmental version is
-[available online][docs].
-
 Note
 ----
 
@@ -35,9 +32,6 @@ Bug reports, pull requests, and comments are very welcome!
 Feel free to contact me on GitHub, through IRC (#haskell on freenode),
 or email (mike@barrucadu.co.uk).
 
-[irc-client]:   https://hackage.haskell.org/package/irc-client
-[build-status]: https://travis-ci.org/barrucadu/irc-client.svg?branch=master
-[build-log]:    https://travis-ci.org/barrucadu/irc-client
-[docs]:         https://docs.barrucadu.co.uk/irc-client
-[irc-conduit]:  https://hackage.haskell.org/package/irc-conduit
-[yukibot]:      https://github.com/barrucadu/yukibot
+[irc-client]:  https://hackage.haskell.org/package/irc-client
+[irc-conduit]: https://hackage.haskell.org/package/irc-conduit
+[yukibot]:     https://github.com/barrucadu/yukibot

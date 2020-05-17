@@ -15,13 +15,14 @@
 -- of this library.
 module Network.IRC.Client.Internal.Lens where
 
-import Control.Applicative (Const(..))
-import Control.Concurrent.STM (TVar, STM, atomically, readTVar, writeTVar)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Functor.Contravariant (Contravariant)
-import Data.Functor.Identity (Identity(..))
-import Data.Monoid (First(..))
-import Data.Profunctor (Choice)
+import           Control.Applicative        (Const(..))
+import           Control.Concurrent.STM     (STM, TVar, atomically, readTVar,
+                                             readTVarIO, writeTVar)
+import           Control.Monad.IO.Class     (MonadIO, liftIO)
+import           Data.Functor.Contravariant (Contravariant)
+import           Data.Functor.Identity      (Identity(..))
+import           Data.Monoid                (First(..))
+import           Data.Profunctor            (Choice)
 
 
 -------------------------------------------------------------------------------
@@ -75,7 +76,7 @@ preview lens = getFirst . getConst . lens (Const . First . Just)
 
 -- | Atomically snapshot some shared state.
 snapshot :: MonadIO m => Getting (TVar a) s (TVar a) -> s -> m a
-snapshot lens = liftIO . atomically . readTVar . get lens
+snapshot lens = liftIO . readTVarIO . get lens
 
 -- | Atomically snapshot and modify some shared state.
 snapshotModify :: MonadIO m => Lens' s (TVar a) -> (a -> STM (a, b)) -> s -> m b
