@@ -20,7 +20,7 @@ module Network.IRC.Client.Internal.Types where
 import           Control.Applicative            (Alternative)
 import           Control.Concurrent             (ThreadId)
 import           Control.Concurrent.STM         (TVar, atomically, readTVar,
-                                                 writeTVar)
+                                                 readTVarIO, writeTVar)
 import           Control.Concurrent.STM.TBMChan (TBMChan)
 import           Control.Monad                  (MonadPlus)
 import           Control.Monad.Catch            (Exception, MonadCatch,
@@ -54,7 +54,7 @@ instance MonadState s (IRC s) where
       pure a
   get = do
     tvar <- asks _userState
-    liftIO $ atomically (readTVar tvar)
+    liftIO $ readTVarIO tvar
   put s = do
     tvar <- asks _userState
     liftIO $ atomically (writeTVar tvar s)
