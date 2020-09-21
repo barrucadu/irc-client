@@ -16,6 +16,12 @@
 -- >   let cfg  = defaultInstanceConfig nick & handlers %~ (yourCustomEventHandlers:)
 -- >   runClient conn cfg ()
 --
+-- The '&' and '%~' comes from the lens library, and they can be replaced by the
+-- provided utility functions 'get' and 'set'. For example:
+--
+-- >   let defaultCfg = defaultInstanceConfig nick
+-- >   let cfg = set handlers (get handlers defaultCfg <> yourCustomEvenHandlers) defaultCfg
+
 -- You shouldn't really need to tweak anything other than the event
 -- handlers, as everything has been designed to be as simple as
 -- possible.
