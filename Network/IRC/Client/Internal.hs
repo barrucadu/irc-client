@@ -138,13 +138,13 @@ runner = do
   -- Fork a thread to disconnect if the timeout elapses.
   mainTId <- liftIO myThreadId
   let time  = _timeout cconf
-  let delay = round time
+  let delayms = 1000000 * round time
   let timeoutThread = do
         now <- getCurrentTime
         prior <- readIORef lastReceived
         if diffUTCTime now prior >= time
           then throwTo mainTId Timeout
-          else threadDelay delay >> timeoutThread
+          else threadDelay delayms >> timeoutThread
   timeoutTId <- liftIO (forkIO timeoutThread)
 
   -- Start the client.
