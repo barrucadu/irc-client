@@ -95,9 +95,9 @@ data ConnectionConfig s = ConnectionConfig
   , _flood      :: NominalDiffTime
   -- ^ The minimum time between two adjacent messages.
   , _timeout    :: NominalDiffTime
-  -- ^ The maximum time between received messages from the server. If no
-  -- messages arrive from the server for this period, the client is sent
-  -- a 'Timeout' exception and disconnects.
+  -- ^ The maximum time (in seconds) between received messages from
+  -- the server. If no messages arrive from the server for this
+  -- period, the client is sent a 'Timeout' exception and disconnects.
   , _onconnect  :: IRC s ()
   -- ^ Action to run after sending the @PASS@ and @USER@ commands to the
   -- server. The default behaviour is to send the @NICK@ command.
