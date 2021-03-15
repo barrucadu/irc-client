@@ -1,3 +1,10 @@
+**This project is essentially abandonware!**
+
+I may respond to minor issues, like version bounds which need
+changing, but I won't be doing any significant work.
+
+Offer to take over the package if you want any significant changes.
+
 [irc-client][]
 ===========
 
