@@ -1,0 +1,118 @@
+###############################################################################
+## Tasks
+
+x-generic-task: &generic-task
+  platform: linux
+  image_resource:
+    type: docker-image
+    source:
+      repository: haskell
+  inputs:
+    - name: source-git
+
+x-task-build-and-test: &task-build-and-test
+  <<: *generic-task
+  run:
+    dir: source-git
+    path: sh
+    args:
+      - -cxe
+      - |
+        export LANG=C.UTF-8
+        stack="stack --no-terminal"
+
+        if [ -f ../stackage-feed/item ]; then
+          apt-get update && apt-get install -y jq
+          resolver="$(jq -r .id < ../stackage-feed/item | cut -d/ -f4)"
+          $stack init --resolver="$resolver" --force
+        fi
+
+        $stack setup
+        $stack build
+
+###############################################################################
+## Pipeline
+
+resource_types:
+  - name: feed-resource
+    type: docker-image
+    source:
+      repository: registry.barrucadu.dev/feed-resource
+      username: registry
+      password: ((docker-registry-password))
+
+resources:
+  - name: stackage-feed
+    type: feed-resource
+    source:
+      uri: https://www.stackage.org/feed
+  - name: irc-client-git
+    type: git
+    source:
+      uri: https://github.com/barrucadu/irc-client.git
+  - name: irc-client-cabal-git
+    type: git
+    source:
+      uri: https://github.com/barrucadu/irc-client.git
+      paths:
+        - irc-client.cabal
+
+jobs:
+  - name: update-pipeline
+    plan:
+      - get: irc-client-git
+        trigger: true
+      - set_pipeline: irc-client
+        file: irc-client-git/concourse/pipeline.yml
+
+  - name: test-snapshot
+    plan:
+      - get: irc-client-git
+        trigger: true
+      - get: stackage-feed
+        trigger: true
+      - task: build-and-test
+        input_mapping:
+          source-git: irc-client-git
+        config:
+          <<: *task-build-and-test
+
+  - name: test
+    plan:
+      - get: irc-client-cabal-git
+        trigger: true
+      - task: build-and-test
+        input_mapping:
+          source-git: irc-client-cabal-git
+        config:
+          <<: *task-build-and-test
+
+  - name: release
+    plan:
+      - get: irc-client-cabal-git
+        trigger: true
+        passed:
+          - test
+      - task: release
+        input_mapping:
+          source-git: irc-client-cabal-git
+        config:
+          <<: *generic-task
+          params:
+            HACKAGE_USERNAME: barrucadu
+            HACKAGE_PASSWORD: ((hackage-password))
+          run:
+            dir: source-git
+            path: sh
+            args:
+              - -cxe
+              - |
+                  ver=$(grep '^version:' irc-client.cabal | sed 's/^version: *//')
+
+                  if curl -fs "http://hackage.haskell.org/package/irc-client-${ver}" >/dev/null; then
+                    echo "version already exists on hackage" >&2
+                    exit 0
+                  fi
+
+                  stack --no-terminal setup
+                  echo n | stack --no-terminal upload .
