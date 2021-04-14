@@ -36,7 +36,7 @@ import           Control.Monad                     (forM_, unless, void, when)
 import           Control.Monad.Catch               (SomeException, catch)
 import           Control.Monad.IO.Class            (MonadIO, liftIO)
 import           Control.Monad.Reader              (ask, runReaderT)
-import           Data.ByteString                   (ByteString)
+import           Data.ByteString                   (ByteString, isPrefixOf)
 import           Data.Conduit                      (ConduitM, await,
                                                     awaitForever, yield, (.|))
 import           Data.IORef                        (IORef, newIORef, readIORef,
@@ -130,7 +130,7 @@ runner = do
 
   let source = sourceTBMChan squeue
                .| antiflood
-               .| logConduit (_logfunc cconf FromClient . toByteString)
+               .| logConduit (_logfunc cconf FromClient . toByteString . concealPass)
   let sink   = forgetful
                .| logConduit (_logfunc cconf FromServer . _raw)
                .| eventSink lastReceived state
@@ -230,6 +230,12 @@ fileLogger fp origin x = do
 -- | Do no logging.
 noopLogger :: a -> b -> IO ()
 noopLogger _ _ = return ()
+
+-- | Clear passwords from logs.
+concealPass :: Message ByteString -> Message ByteString
+concealPass (RawMsg msg)
+  | "PASS " `isPrefixOf` msg = rawMessage "PASS" ["<password redacted>"]
+concealPass m = m
 
 
 -------------------------------------------------------------------------------
