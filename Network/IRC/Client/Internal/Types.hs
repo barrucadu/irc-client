@@ -100,10 +100,14 @@ data IRCState s = IRCState
   }
 
 -- | On connect handler in 'ConnectionConfig'
-type ConnectHandler s = forall m. MonadIRC s m => m ()
+--
+-- GHC does not support impredicative types, so we need wrap forall into a newtype.
+newtype ConnectHandler s = ConnectHandler { runConnectHandler :: forall m. MonadIRC s m => m () }
 
 -- | On disconnect handler in 'ConnectionConfig'
-type DisconnectHandler s = forall m. MonadIRC s m => Maybe SomeException -> m ()
+--
+-- GHC does not support impredicative types, so we need wrap forall into a newtype.
+newtype DisconnectHandler s = DisconnectHandler { runDisconnectHandler :: forall m. MonadIRC s m => Maybe SomeException -> m () }
 
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig

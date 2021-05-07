@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -46,8 +47,7 @@ module Network.IRC.Client.Events
 
 import           Control.Applicative         ((<|>))
 import           Control.Concurrent.STM      (atomically, modifyTVar, readTVar)
-import           Control.Monad.Catch         (fromException,
-                                              throwM)
+import           Control.Monad.Catch         (fromException, throwM)
 import           Control.Monad.IO.Class      (liftIO)
 import           Data.Char                   (isAlphaNum)
 import           Data.Maybe                  (fromMaybe)
@@ -168,7 +168,7 @@ defaultEventHandlers =
 
 -- | The default connect handler: set the nick.
 defaultOnConnect :: ConnectHandler s
-defaultOnConnect = do
+defaultOnConnect = ConnectHandler $ do
   iconf <- snapshot instanceConfig =<< getIRCState
   send . Nick $ get nick iconf
 
@@ -180,10 +180,11 @@ defaultOnConnect = do
 --
 --    - If the client disconnected without an exception, halt.
 defaultOnDisconnect :: DisconnectHandler s
-defaultOnDisconnect (Just exc) = case fromException exc of
+defaultOnDisconnect = DisconnectHandler $ \case
+ (Just exc) -> case fromException exc of
   Just Timeout -> reconnect
   Nothing -> throwM exc
-defaultOnDisconnect Nothing = pure ()
+ Nothing -> pure ()
 
 
 -------------------------------------------------------------------------------

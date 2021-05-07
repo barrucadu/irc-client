@@ -117,7 +117,7 @@ runner = do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
-        _onconnect cconf
+        runConnectHandler $ _onconnect cconf
 
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
@@ -153,7 +153,7 @@ runner = do
     (pure . Just)
 
   disconnect
-  _ondisconnect cconf exc
+  runDisconnectHandler (_ondisconnect cconf) exc
 
 -- | Forget failed decodings.
 forgetful :: Monad m => ConduitM (Either a b) b m ()

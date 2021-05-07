@@ -110,17 +110,15 @@ flood = \ afb s -> (\ b -> s {_flood = b}) <$> afb (_flood s)
 timeout :: Lens' (ConnectionConfig s) NominalDiffTime
 timeout = \ afb s -> (\ b -> s {_timeout = b}) <$> afb (_timeout s)
 
--- TODO: polymorphic functions are not first-class before GHC 9.2
+{-# INLINE onconnect #-}
+{-| 'Lens' for '_onconnect'. -}
+onconnect :: Lens' (ConnectionConfig s) (ConnectHandler s)
+onconnect = \ afb s -> (\ b -> s {_onconnect = b}) <$> afb (_onconnect s)
 
--- {-# INLINE onconnect #-}
--- {-| 'Lens' for '_onconnect'. -}
--- onconnect :: Lens' (ConnectionConfig s) (ConnectHandler s)
--- onconnect = \ afb s -> (\ b -> s {_onconnect = b}) <$> afb (_onconnect s)
-
--- {-# INLINE ondisconnect #-}
--- {-| 'Lens' for '_ondisconnect'. -}
--- ondisconnect :: Lens' (ConnectionConfig s) (DisconnectHandler s)
--- ondisconnect = \ afb s -> (\ b -> s {_ondisconnect = b}) <$> afb (_ondisconnect s)
+{-# INLINE ondisconnect #-}
+{-| 'Lens' for '_ondisconnect'. -}
+ondisconnect :: Lens' (ConnectionConfig s) (DisconnectHandler s)
+ondisconnect = \ afb s -> (\ b -> s {_ondisconnect = b}) <$> afb (_ondisconnect s)
 
 {-# INLINE logfunc #-}
 {-| 'Lens' for '_logfunc'. -}
