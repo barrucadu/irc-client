@@ -185,6 +185,7 @@ import           Network.IRC.Client.Lens
 import           Network.IRC.Client.Utils       hiding (fork)
 import qualified Network.IRC.Client.Utils       as U
 
+import           Control.Monad.Catch            (MonadThrow)
 import qualified Paths_irc_client               as Paths
 
 
@@ -260,7 +261,7 @@ defaultInstanceConfig n = InstanceConfig
 
 -- | Connect to the IRC server and run the client: receiving messages
 -- and handing them off to handlers as appropriate.
-runClient :: MonadIO m
+runClient :: (MonadIO m, MonadThrow m)
   => ConnectionConfig s
   -> InstanceConfig s
   -> s
@@ -274,7 +275,7 @@ runClient cconf iconf ustate = newIRCState cconf iconf ustate >>= runClientWith
 -- Multiple clients should not be run with the same 'IRCState'. The
 -- utility of this is to be able to run @IRC s a@ actions in order to
 -- interact with the client from the outside.
-runClientWith :: MonadIO m => IRCState s -> m ()
+runClientWith :: (MonadIO m, MonadThrow m) => IRCState s -> m ()
 runClientWith = runIRCAction runner
 
 

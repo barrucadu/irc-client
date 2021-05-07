@@ -44,14 +44,13 @@ module Network.IRC.Client.Events
   , module Network.IRC.Conduit.Lens
   ) where
 
-import           Control.Applicative         ((<$>), (<|>))
+import           Control.Applicative         ((<|>))
 import           Control.Concurrent.STM      (atomically, modifyTVar, readTVar)
-import           Control.Monad.Catch         (SomeException, fromException,
+import           Control.Monad.Catch         (fromException,
                                               throwM)
 import           Control.Monad.IO.Class      (liftIO)
 import           Data.Char                   (isAlphaNum)
 import           Data.Maybe                  (fromMaybe)
-import           Data.Monoid                 ((<>))
 import           Data.Text                   (Text, breakOn, takeEnd, toUpper)
 import           Data.Time.Clock             (getCurrentTime)
 import           Data.Time.Format            (formatTime)
@@ -168,7 +167,7 @@ defaultEventHandlers =
   ]
 
 -- | The default connect handler: set the nick.
-defaultOnConnect :: IRC s ()
+defaultOnConnect :: ConnectHandler s
 defaultOnConnect = do
   iconf <- snapshot instanceConfig =<< getIRCState
   send . Nick $ get nick iconf
@@ -180,7 +179,7 @@ defaultOnConnect = do
 --    - If the client disconnected due to another exception, rethrow it.
 --
 --    - If the client disconnected without an exception, halt.
-defaultOnDisconnect :: Maybe SomeException -> IRC s ()
+defaultOnDisconnect :: DisconnectHandler s
 defaultOnDisconnect (Just exc) = case fromException exc of
   Just Timeout -> reconnect
   Nothing -> throwM exc

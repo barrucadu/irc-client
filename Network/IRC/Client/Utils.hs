@@ -60,7 +60,7 @@ import           Network.IRC.Client.Lens
 -- | Update the nick in the instance configuration and also send an
 -- update message to the server. This doesn't attempt to resolve nick
 -- collisions, that's up to the event handlers.
-setNick :: Text -> IRC s ()
+setNick :: MonadIRC s m => Text -> m ()
 setNick new = do
   tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $
@@ -73,7 +73,7 @@ setNick new = do
 
 -- | Update the channel list in the instance configuration and also
 -- part the channel.
-leaveChannel :: Text -> Maybe Text -> IRC s ()
+leaveChannel :: MonadIRC s m => Text -> Maybe Text -> m ()
 leaveChannel chan reason = do
   tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $ delChan tvarI chan
@@ -91,18 +91,18 @@ delChan tvarI chan =
 -- Events
 
 -- | Add an event handler
-addHandler :: EventHandler s -> IRC s ()
+addHandler :: MonadIRC s m => EventHandler s -> m ()
 addHandler handler = do
   tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $
     modifyTVar tvarI (modify handlers (handler:))
 
 -- | Send a message to the source of an event.
-reply :: Event Text -> Text -> IRC s ()
+reply :: MonadIRC s m => Event Text -> Text -> m ()
 reply = replyTo . _source
 
 -- | Send a message to the source of an event.
-replyTo :: Source Text -> Text -> IRC s ()
+replyTo :: MonadIRC s m => Source Text -> Text -> m ()
 replyTo (Channel c _) = mapM_ (send . Privmsg c . Right) . T.lines
 replyTo (User n)      = mapM_ (send . Privmsg n . Right) . T.lines
 replyTo _ = const $ pure ()
@@ -124,19 +124,19 @@ ctcpReply t command args = Notice t . Left $ toCTCP command args
 -- Connection state
 
 -- | Check if the client is connected.
-isConnected :: IRC s Bool
+isConnected :: MonadIRC s m => m Bool
 isConnected = (==Connected) <$> snapConnState
 
 -- | Check if the client is in the process of disconnecting.
-isDisconnecting :: IRC s Bool
+isDisconnecting :: MonadIRC s m => m Bool
 isDisconnecting = (==Disconnecting) <$> snapConnState
 
 -- | Check if the client is disconnected
-isDisconnected :: IRC s Bool
+isDisconnected :: MonadIRC s m => m Bool
 isDisconnected = (==Disconnected) <$> snapConnState
 
 -- | Snapshot the connection state.
-snapConnState :: IRC s ConnectionState
+snapConnState :: MonadIRC s m => m ConnectionState
 snapConnState = liftIO . atomically . getConnectionState =<< getIRCState
 
 
