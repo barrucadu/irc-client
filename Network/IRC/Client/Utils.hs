@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- |
 -- Module      : Network.IRC.Client.Utils
 -- Copyright   : (c) 2016 Michael Walker
@@ -32,6 +34,7 @@ module Network.IRC.Client.Utils
 
     -- * Concurrency
   , fork
+  , forkUnliftIO
 
     -- * Lenses
   , snapshot
@@ -43,7 +46,7 @@ module Network.IRC.Client.Utils
 
 import           Control.Concurrent          (ThreadId, forkFinally, myThreadId)
 import           Control.Concurrent.STM      (STM, TVar, atomically, modifyTVar)
-import           Control.Monad.IO.Class      (liftIO)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import qualified Data.Set                    as S
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
@@ -51,6 +54,7 @@ import           Network.IRC.CTCP            (toCTCP)
 import           Network.IRC.Conduit         (Event(..), Message(..),
                                               Source(..))
 
+import           Control.Monad.Catch         (MonadThrow)
 import           Network.IRC.Client.Internal
 import           Network.IRC.Client.Lens
 
@@ -146,10 +150,14 @@ snapConnState = liftIO . atomically . getConnectionState =<< getIRCState
 -- | Fork a thread which will be thrown a 'Disconnect' exception when
 -- the client disconnects.
 fork :: IRC s () -> IRC s ThreadId
-fork ma = do
+fork = forkUnliftIO id
+
+-- | A more general version of 'fork', which accepts 'IRCT'. The underlaying monad should have the ability to be run as IO.
+forkUnliftIO :: (MonadIO m, MonadThrow m) => (forall a. m a -> IO a) -> IRCT s m () -> IRCT s m ThreadId
+forkUnliftIO unliftIO ma = do
   s <- getIRCState
   liftIO $ do
-    tid <- forkFinally (runIRCAction ma s) $ \_ -> do
+    tid <- forkFinally (unliftIO $ runIRCAction ma s) $ \_ -> do
       tid <- myThreadId
       atomically $ modifyTVar (_runningThreads s) (S.delete tid)
     atomically $ modifyTVar (_runningThreads s) (S.insert tid)
