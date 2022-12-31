@@ -1,7 +1,9 @@
 flags: {}
 packages:
 - '.'
-resolver: lts-17.0
+extra-deps:
+- irc-conduit-0.3.0.6
+resolver: lts-20.0
 nix:
   enable: false
   packages: [zlib]
