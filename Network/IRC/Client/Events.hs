@@ -55,10 +55,10 @@ import           Data.Monoid                 ((<>))
 import           Data.Text                   (Text, breakOn, takeEnd, toUpper)
 import           Data.Time.Clock             (getCurrentTime)
 import           Data.Time.Format            (formatTime)
-import           Network.IRC.CTCP            (fromCTCP)
 import           Network.IRC.Conduit         (Event(..), Message(..),
                                               Source(..))
 import           Network.IRC.Conduit.Lens
+import           Network.IRC.CTCP            (fromCTCP)
 
 #if MIN_VERSION_time(1,5,0)
 import           Data.Time.Format            (defaultTimeLocale)
