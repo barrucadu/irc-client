@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- |
 -- Module      : Network.IRC.Client.Internal
@@ -22,7 +23,6 @@ module Network.IRC.Client.Internal
   , module Network.IRC.Client.Internal.Types
   ) where
 
-import           Control.Applicative               ((<$>))
 import           Control.Concurrent                (forkIO, killThread,
                                                     myThreadId, threadDelay,
                                                     throwTo)
@@ -33,9 +33,9 @@ import           Control.Concurrent.STM.TBMChan    (TBMChan, closeTBMChan,
                                                     isEmptyTBMChan, newTBMChan,
                                                     readTBMChan, writeTBMChan)
 import           Control.Monad                     (forM_, unless, void, when)
-import           Control.Monad.Catch               (SomeException, catch)
+import           Control.Monad.Catch               (SomeException, catch, MonadThrow)
 import           Control.Monad.IO.Class            (MonadIO, liftIO)
-import           Control.Monad.Reader              (ask, runReaderT)
+import           Control.Monad.Reader              (runReaderT)
 import           Data.ByteString                   (ByteString, isPrefixOf)
 import           Data.Conduit                      (ConduitM, await,
                                                     awaitForever, yield, (.|))
@@ -72,9 +72,9 @@ import           Network.IRC.Client.Lens
 setupInternal
   :: (IO () -> ConduitM (Either ByteString (Event ByteString)) Void IO () -> ConduitM () (Message ByteString) IO () -> IO ())
   -- ^ Function to start the network conduits.
-  -> IRC s ()
+  -> ConnectHandler s
   -- ^ Connect handler
-  -> (Maybe SomeException -> IRC s ())
+  -> DisconnectHandler s
   -- ^ Disconnect handler
   -> (Origin -> ByteString -> IO ())
   -- ^ Logging function
@@ -102,7 +102,7 @@ setupInternal f oncon ondis logf host port_ = ConnectionConfig
 -- * Event loop
 
 -- | The event loop.
-runner :: IRC s ()
+runner :: MonadIRC s m => m ()
 runner = do
   state <- getIRCState
   let cconf = _connectionConfig state
@@ -117,7 +117,7 @@ runner = do
         liftIO . atomically $ writeTVar (_connectionState state) Connected
         mapM_ (\p -> sendBS $ rawMessage "PASS" [encodeUtf8 p]) thePass
         sendBS $ rawMessage "USER" [encodeUtf8 theUser, "-", "-", encodeUtf8 theReal]
-        _onconnect cconf
+        runConnectHandler $ _onconnect cconf
 
   -- Run the event loop, and call the disconnect handler if the remote
   -- end closes the socket.
@@ -153,7 +153,7 @@ runner = do
     (pure . Just)
 
   disconnect
-  _ondisconnect cconf exc
+  runDisconnectHandler (_ondisconnect cconf) exc
 
 -- | Forget failed decodings.
 forgetful :: Monad m => ConduitM (Either a b) b m ()
@@ -243,12 +243,12 @@ concealPass m = m
 
 -- | Send a message as UTF-8, using TLS if enabled. This blocks if
 -- messages are sent too rapidly.
-send :: Message Text -> IRC s ()
+send :: MonadIRC s m => Message Text -> m ()
 send = sendBS . fmap encodeUtf8
 
 -- | Send a message, using TLS if enabled. This blocks if messages are
 -- sent too rapidly.
-sendBS :: Message ByteString -> IRC s ()
+sendBS :: MonadIRC s m => Message ByteString -> m ()
 sendBS msg = do
   qv <- _sendqueue <$> getIRCState
   liftIO . atomically $ flip writeTBMChan msg =<< readTVar qv
@@ -259,7 +259,7 @@ sendBS msg = do
 
 -- | Disconnect from the server, properly tearing down the TLS session
 -- (if there is one).
-disconnect :: IRC s ()
+disconnect :: MonadIRC s m => m ()
 disconnect = do
   s <- getIRCState
 
@@ -298,7 +298,7 @@ disconnect = do
 --
 -- Like 'runClient' and 'runClientWith', this will not return until
 -- the client terminates (ie, disconnects without reconnecting).
-reconnect :: IRC s ()
+reconnect :: MonadIRC s m => m ()
 reconnect = do
   disconnect
 
@@ -314,12 +314,8 @@ reconnect = do
 -- * Utils
 
 -- | Interact with a client from the outside, by using its 'IRCState'.
-runIRCAction :: MonadIO m => IRC s a -> IRCState s -> m a
-runIRCAction ma = liftIO . runReaderT (runIRC ma)
-
--- | Access the client state.
-getIRCState :: IRC s (IRCState s)
-getIRCState = ask
+runIRCAction :: (MonadIO m, MonadThrow m) => IRCT s m a -> IRCState s -> m a
+runIRCAction ma = runReaderT (runIRCT ma)
 
 -- | Get the connection state from an IRC state.
 getConnectionState :: IRCState s -> STM ConnectionState

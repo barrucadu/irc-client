@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- |
 -- Module      : Network.IRC.Client.Utils
 -- Copyright   : (c) 2016 Michael Walker
@@ -32,6 +34,7 @@ module Network.IRC.Client.Utils
 
     -- * Concurrency
   , fork
+  , forkUnliftIO
 
     -- * Lenses
   , snapshot
@@ -43,7 +46,7 @@ module Network.IRC.Client.Utils
 
 import           Control.Concurrent          (ThreadId, forkFinally, myThreadId)
 import           Control.Concurrent.STM      (STM, TVar, atomically, modifyTVar)
-import           Control.Monad.IO.Class      (liftIO)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
 import qualified Data.Set                    as S
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
@@ -51,6 +54,7 @@ import           Network.IRC.Conduit         (Event(..), Message(..),
                                               Source(..))
 import           Network.IRC.CTCP            (toCTCP)
 
+import           Control.Monad.Catch         (MonadThrow)
 import           Network.IRC.Client.Internal
 import           Network.IRC.Client.Lens
 
@@ -60,7 +64,7 @@ import           Network.IRC.Client.Lens
 -- | Update the nick in the instance configuration and also send an
 -- update message to the server. This doesn't attempt to resolve nick
 -- collisions, that's up to the event handlers.
-setNick :: Text -> IRC s ()
+setNick :: MonadIRC s m => Text -> m ()
 setNick new = do
   tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $
@@ -73,7 +77,7 @@ setNick new = do
 
 -- | Update the channel list in the instance configuration and also
 -- part the channel.
-leaveChannel :: Text -> Maybe Text -> IRC s ()
+leaveChannel :: MonadIRC s m => Text -> Maybe Text -> m ()
 leaveChannel chan reason = do
   tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $ delChan tvarI chan
@@ -91,18 +95,18 @@ delChan tvarI chan =
 -- Events
 
 -- | Add an event handler
-addHandler :: EventHandler s -> IRC s ()
+addHandler :: MonadIRC s m => EventHandler s -> m ()
 addHandler handler = do
   tvarI <- get instanceConfig <$> getIRCState
   liftIO . atomically $
     modifyTVar tvarI (modify handlers (handler:))
 
 -- | Send a message to the source of an event.
-reply :: Event Text -> Text -> IRC s ()
+reply :: MonadIRC s m => Event Text -> Text -> m ()
 reply = replyTo . _source
 
 -- | Send a message to the source of an event.
-replyTo :: Source Text -> Text -> IRC s ()
+replyTo :: MonadIRC s m => Source Text -> Text -> m ()
 replyTo (Channel c _) = mapM_ (send . Privmsg c . Right) . T.lines
 replyTo (User n)      = mapM_ (send . Privmsg n . Right) . T.lines
 replyTo _ = const $ pure ()
@@ -124,19 +128,19 @@ ctcpReply t command args = Notice t . Left $ toCTCP command args
 -- Connection state
 
 -- | Check if the client is connected.
-isConnected :: IRC s Bool
+isConnected :: MonadIRC s m => m Bool
 isConnected = (==Connected) <$> snapConnState
 
 -- | Check if the client is in the process of disconnecting.
-isDisconnecting :: IRC s Bool
+isDisconnecting :: MonadIRC s m => m Bool
 isDisconnecting = (==Disconnecting) <$> snapConnState
 
 -- | Check if the client is disconnected
-isDisconnected :: IRC s Bool
+isDisconnected :: MonadIRC s m => m Bool
 isDisconnected = (==Disconnected) <$> snapConnState
 
 -- | Snapshot the connection state.
-snapConnState :: IRC s ConnectionState
+snapConnState :: MonadIRC s m => m ConnectionState
 snapConnState = liftIO . atomically . getConnectionState =<< getIRCState
 
 
@@ -146,10 +150,14 @@ snapConnState = liftIO . atomically . getConnectionState =<< getIRCState
 -- | Fork a thread which will be thrown a 'Disconnect' exception when
 -- the client disconnects.
 fork :: IRC s () -> IRC s ThreadId
-fork ma = do
+fork = forkUnliftIO id
+
+-- | A more general version of 'fork', which accepts 'IRCT'. The underlaying monad should have the ability to be run as IO.
+forkUnliftIO :: (MonadIO m, MonadThrow m) => (forall a. m a -> IO a) -> IRCT s m () -> IRCT s m ThreadId
+forkUnliftIO unliftIO ma = do
   s <- getIRCState
   liftIO $ do
-    tid <- forkFinally (runIRCAction ma s) $ \_ -> do
+    tid <- forkFinally (unliftIO $ runIRCAction ma s) $ \_ -> do
       tid <- myThreadId
       atomically $ modifyTVar (_runningThreads s) (S.delete tid)
     atomically $ modifyTVar (_runningThreads s) (S.insert tid)

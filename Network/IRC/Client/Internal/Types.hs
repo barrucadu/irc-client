@@ -1,7 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE RankNTypes #-}
 
 -- |
 -- Module      : Network.IRC.Client.Internal.Types
@@ -26,9 +30,9 @@ import           Control.Monad                  (MonadPlus)
 import           Control.Monad.Catch            (Exception, MonadCatch,
                                                  MonadMask, MonadThrow,
                                                  SomeException)
-import           Control.Monad.IO.Class         (MonadIO, liftIO)
-import           Control.Monad.Reader           (MonadReader, ReaderT, asks)
+import           Control.Monad.Reader           (MonadReader, ReaderT, ask)
 import           Control.Monad.State            (MonadState(..))
+import           Control.Monad.Trans
 import           Data.ByteString                (ByteString)
 import           Data.Conduit                   (ConduitM)
 import qualified Data.Set                       as S
@@ -42,21 +46,38 @@ import           Network.IRC.Conduit            (Event(..), Message, Source)
 -- * The IRC monad
 
 -- | The IRC monad.
-newtype IRC s a = IRC { runIRC :: ReaderT (IRCState s) IO a }
+type IRC s a = IRCT s IO a
+
+-- | The IRC monad transformer
+newtype IRCT s m a = IRCT { runIRCT :: ReaderT (IRCState s) m a }
   deriving (Functor, Applicative, Alternative, Monad, MonadPlus, MonadIO, MonadReader (IRCState s), MonadThrow, MonadCatch, MonadMask)
 
-instance MonadState s (IRC s) where
+instance MonadTrans (IRCT s) where
+  lift = IRCT . lift
+
+-- | mtl style class for IRC monad
+class (MonadIO m, MonadThrow m) => MonadIRC s m | m -> s where
+  -- | Access the client state.
+  getIRCState :: m (IRCState s)
+
+instance (MonadIO m, MonadThrow m) => MonadIRC s (IRCT s m) where
+  getIRCState = ask
+
+-- | Add MonadState instances for each MonadIRC monad
+--
+-- This enables orphan instances
+instance (Monad m, MonadIRC s m) => MonadState s m where
   state f = do
-    tvar <- asks _userState
+    tvar <- _userState <$> getIRCState
     liftIO . atomically $ do
       (a, s) <- f <$> readTVar tvar
       writeTVar tvar s
       pure a
   get = do
-    tvar <- asks _userState
+    tvar <- _userState <$> getIRCState
     liftIO $ readTVarIO tvar
   put s = do
-    tvar <- asks _userState
+    tvar <- _userState <$> getIRCState
     liftIO $ atomically (writeTVar tvar s)
 
 -------------------------------------------------------------------------------
@@ -78,6 +99,16 @@ data IRCState s = IRCState
   -- ^ Threads which will be killed when the client disconnects.
   }
 
+-- | On connect handler in 'ConnectionConfig'
+--
+-- GHC does not support impredicative types, so we need wrap forall into a newtype.
+newtype ConnectHandler s = ConnectHandler { runConnectHandler :: forall m. MonadIRC s m => m () }
+
+-- | On disconnect handler in 'ConnectionConfig'
+--
+-- GHC does not support impredicative types, so we need wrap forall into a newtype.
+newtype DisconnectHandler s = DisconnectHandler { runDisconnectHandler :: forall m. MonadIRC s m => Maybe SomeException -> m () }
+
 -- | The static state of an IRC server connection.
 data ConnectionConfig s = ConnectionConfig
   { _func       :: IO () -> ConduitM (Either ByteString (Event ByteString)) Void IO () -> ConduitM () (Message ByteString) IO () -> IO ()
@@ -98,10 +129,10 @@ data ConnectionConfig s = ConnectionConfig
   -- ^ The maximum time (in seconds) between received messages from
   -- the server. If no messages arrive from the server for this
   -- period, the client is sent a 'Timeout' exception and disconnects.
-  , _onconnect  :: IRC s ()
+  , _onconnect  :: ConnectHandler s
   -- ^ Action to run after sending the @PASS@ and @USER@ commands to the
   -- server. The default behaviour is to send the @NICK@ command.
-  , _ondisconnect :: Maybe SomeException -> IRC s ()
+  , _ondisconnect :: DisconnectHandler s
   -- ^ Action to run after disconnecting from the server, both by
   -- local choice and by losing the connection. This is run after
   -- tearing down the connection. If the connection terminated due to
@@ -146,7 +177,7 @@ data Origin = FromServer | FromClient
 data EventHandler s where
   EventHandler
     :: (Event Text -> Maybe b)
-    -> (Source Text -> b -> IRC s ())
+    -> (forall m. MonadIRC s m => Source Text -> b -> m ())
     -> EventHandler s
 
 
