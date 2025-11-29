@@ -22,7 +22,6 @@ module Network.IRC.Client.Internal
   , module Network.IRC.Client.Internal.Types
   ) where
 
-import           Control.Applicative               ((<$>))
 import           Control.Concurrent                (forkIO, killThread,
                                                     myThreadId, threadDelay,
                                                     throwTo)

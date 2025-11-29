@@ -44,14 +44,13 @@ module Network.IRC.Client.Events
   , module Network.IRC.Conduit.Lens
   ) where
 
-import           Control.Applicative         ((<$>), (<|>))
+import           Control.Applicative         ((<|>))
 import           Control.Concurrent.STM      (atomically, modifyTVar, readTVar)
 import           Control.Monad.Catch         (SomeException, fromException,
                                               throwM)
 import           Control.Monad.IO.Class      (liftIO)
 import           Data.Char                   (isAlphaNum)
 import           Data.Maybe                  (fromMaybe)
-import           Data.Monoid                 ((<>))
 import           Data.Text                   (Text, breakOn, takeEnd, toUpper)
 import           Data.Time.Clock             (getCurrentTime)
 import           Data.Time.Format            (formatTime)
