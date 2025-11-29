@@ -43,6 +43,7 @@ module Network.IRC.Client.Utils
 
 import           Control.Concurrent          (ThreadId, forkFinally, myThreadId)
 import           Control.Concurrent.STM      (STM, TVar, atomically, modifyTVar)
+import           Control.Exception           (throwIO)
 import           Control.Monad.IO.Class      (liftIO)
 import qualified Data.Set                    as S
 import           Data.Text                   (Text)
@@ -149,8 +150,9 @@ fork :: IRC s () -> IRC s ThreadId
 fork ma = do
   s <- getIRCState
   liftIO $ do
-    tid <- forkFinally (runIRCAction ma s) $ \_ -> do
+    tid <- forkFinally (runIRCAction ma s) $ \res -> do
       tid <- myThreadId
       atomically $ modifyTVar (_runningThreads s) (S.delete tid)
+      either throwIO pure res
     atomically $ modifyTVar (_runningThreads s) (S.insert tid)
     pure tid
