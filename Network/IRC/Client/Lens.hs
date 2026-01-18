@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 -- |
 -- Module      : Network.IRC.Client.Lens
 -- Copyright   : (c) 2017 Michael Walker
@@ -10,7 +12,6 @@
 module Network.IRC.Client.Lens where
 
 import           Control.Concurrent.STM            (TVar)
-import           Control.Monad.Catch               (SomeException)
 import           Data.ByteString                   (ByteString)
 import           Data.Profunctor                   (Choice(right'),
                                                     Profunctor(dimap))
@@ -111,12 +112,12 @@ timeout = \ afb s -> (\ b -> s {_timeout = b}) <$> afb (_timeout s)
 
 {-# INLINE onconnect #-}
 {-| 'Lens' for '_onconnect'. -}
-onconnect :: Lens' (ConnectionConfig s) (IRC s ())
+onconnect :: Lens' (ConnectionConfig s) (ConnectHandler s)
 onconnect = \ afb s -> (\ b -> s {_onconnect = b}) <$> afb (_onconnect s)
 
 {-# INLINE ondisconnect #-}
 {-| 'Lens' for '_ondisconnect'. -}
-ondisconnect :: Lens' (ConnectionConfig s) (Maybe SomeException -> IRC s ())
+ondisconnect :: Lens' (ConnectionConfig s) (DisconnectHandler s)
 ondisconnect = \ afb s -> (\ b -> s {_ondisconnect = b}) <$> afb (_ondisconnect s)
 
 {-# INLINE logfunc #-}
