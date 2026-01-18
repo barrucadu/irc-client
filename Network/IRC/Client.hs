@@ -16,6 +16,12 @@
 -- >   let cfg  = defaultInstanceConfig nick & handlers %~ (yourCustomEventHandlers:)
 -- >   runClient conn cfg ()
 --
+-- The '&' and '%~' comes from the lens library, and they can be replaced by the
+-- provided utility functions 'get' and 'set'. For example:
+--
+-- >   let defaultCfg = defaultInstanceConfig nick
+-- >   let cfg = set handlers (get handlers defaultCfg <> yourCustomEvenHandlers) defaultCfg
+
 -- You shouldn't really need to tweak anything other than the event
 -- handlers, as everything has been designed to be as simple as
 -- possible.
@@ -274,6 +280,22 @@ runClient cconf iconf ustate = newIRCState cconf iconf ustate >>= runClientWith
 -- Multiple clients should not be run with the same 'IRCState'. The
 -- utility of this is to be able to run @IRC s a@ actions in order to
 -- interact with the client from the outside.
+--
+-- Typical usage will be of this form:
+--
+-- > ircThread :: IRCState s -> IO ()
+-- > ircThread state = Control.Exception.handle doReconnect (runClientWith state)
+-- >   where
+-- >     doReconnect :: Disconnect -> IO ()
+-- >     doReconnect e = do
+-- >       print ("irc client exited: " <> show e)
+-- >       threadDelay 1000000 >> runIRCAction reconnect state >> ircThread state
+--
+-- > mainThread :: ConnectionConfig s -> InstanceConfig s -> IO ()
+-- > mainThread conn cfg = do
+-- >   state <- newIRCState conn cfg ()
+-- >   withAsync (ircThread state) (const (runMain state))
+--
 runClientWith :: MonadIO m => IRCState s -> m ()
 runClientWith = runIRCAction runner
 
